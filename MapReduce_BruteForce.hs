@@ -56,20 +56,11 @@ instance Eq (Bool -> Bool -> Bool) where (==) = (==) `on` functionToTruthTable
 
 data Gate = Constant Bool | Input Bool Int | Function (Bool->Bool->Bool) Gate Gate deriving (Eq, Show)
 
-{-
-mkManualLessThan size = output where
-    primitive f i = Function f (Input False i) (Input True i)
-    lessthans = map (primitive (<)) [1..size]
-    xnors = Constant True : map (primitive ((not .) . xor)) [1..size-1]
-    intermediate = zipWith (Function (&&)) lessthans xnors
-    output = foldr (Function (||)) (Constant False) intermediate
--}
 mkManualLessThan size = output where
     primitive f i = Function f (Input False i) (Input True i)
     lessthans = map (primitive (<)) [size-1,size-2..0]
     xnors = Constant True : map (primitive ((not .) . xor)) [size-1,size-2..0]
-    --intermediate1 = Constant True : Constant True : zipWith (Function (&&)) xnors (tail intermediate1)
-    intermediate1 = map (\i -> if i < 1 then Constant True else Function (&&) (xnors !! (i-1)) (intermediate1 !! (i-1))) [0..]
+    intermediate1 = Constant True : zipWith (Function (&&)) intermediate1 (tail xnors)
     intermediate2 = zipWith3 (\x y z -> (Function (&&) x (Function (&&) y z))) lessthans xnors intermediate1
     output = foldr (Function (||)) (Constant False) intermediate2
 
@@ -83,7 +74,9 @@ optimize (Function f g1 g2) = aux (functionToTruthTable f) g1 g2 where
     andT = functionToTruthTable (&&)
     orT = functionToTruthTable (||)
     aux t g1 (Constant True) | t == andT = optimize g1
+    aux t (Constant True) g2 | t == andT = optimize g2
     aux t g1 (Constant False) | t == orT = optimize g1
+    aux t (Constant False) g2 | t == orT = optimize g2
     aux _ g1 g2 = Function f (optimize g1) (optimize g2)
 optimize x = x
 
@@ -100,4 +93,4 @@ main = do
     putStrLn "-----"
     mapM (print . counterExamples') [0..8]
     putStrLn "-----"
-    quickCheck (\x y -> eval (mkManualLessThan 8) (x :: Word8) y == (x < y))
+    verboseCheck (\x y -> eval (mkManualLessThan 64) (x :: Word64) y == (x < y))
