@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
-import Control.Arrow
 import Data.Bits
 import Data.Ix
+import Data.Function
 import Data.Word
 import Test.QuickCheck
 
@@ -52,7 +52,9 @@ instance Show (Bool -> Bool -> Bool) where
         aux (True, False, False, True) = "xnor"
         aux x = show x
 
-data Gate = Constant Bool | Input Bool Int | Function (Bool->Bool->Bool) Gate Gate deriving Show
+instance Eq (Bool -> Bool -> Bool) where (==) = (==) `on` functionToTruthTable
+
+data Gate = Constant Bool | Input Bool Int | Function (Bool->Bool->Bool) Gate Gate deriving (Eq, Show)
 
 {-
 mkManualLessThan size = output where
@@ -76,8 +78,26 @@ eval (Input False i) = (\x y -> testBit x i)
 eval (Input True i) = (\x y -> testBit y i)
 eval (Function f g1 g2) = (\x y -> f (eval g1 x y) (eval g2 x y))
 
-counterExamples n = filter (\(_,_,a,b) -> a /= b) [(x :: Word64,y,eval (mkManualLessThan n) x y,x < y) | x <- [0..2^n-1], y <- [0..2^n-1]]
+optimize :: Gate -> Gate
+optimize (Function f g1 g2) = aux (functionToTruthTable f) g1 g2 where
+    andT = functionToTruthTable (&&)
+    orT = functionToTruthTable (||)
+    aux t g1 (Constant True) | t == andT = optimize g1
+    aux t g1 (Constant False) | t == orT = optimize g1
+    aux _ g1 g2 = Function f (optimize g1) (optimize g2)
+optimize x = x
+
+fixConverge f x = let y = f x in if y == x then y else fixConverge f y
+
+counterExamples n = filter (\(_,_,a,b) -> a /= b) [(x :: Word64,y,eval circuit x y,x < y) | x <- [0..2^n-1], y <- [0..2^n-1]] where
+    circuit = mkManualLessThan n
+counterExamples' n = filter (\(_,_,a,b) -> a /= b) [(x :: Word64,y,eval circuit x y,x < y) | x <- [0..2^n-1], y <- [0..2^n-1]] where
+    circuit = fixConverge optimize $ mkManualLessThan n
+
 
 main = do
     mapM (print . counterExamples) [0..8]
+    putStrLn "-----"
+    mapM (print . counterExamples') [0..8]
+    putStrLn "-----"
     quickCheck (\x y -> eval (mkManualLessThan 8) (x :: Word8) y == (x < y))
