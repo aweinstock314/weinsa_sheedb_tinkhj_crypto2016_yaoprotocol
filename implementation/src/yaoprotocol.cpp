@@ -32,6 +32,14 @@ class TerriblyInsecureObliviousTransfer {
     }
 };
 
+
+/******************************************************************************/
+/* Wire and related structs ***************************************************/
+/******************************************************************************/
+
+// Derived from this haskell datastructure
+// data Gate = Input Bool Int | Function (Bool->Bool->Bool) Gate Gate | Output Gate deriving (Eq, Show)
+
 struct SenderTag {};
 struct ReceiverTag {};
 
@@ -76,6 +84,68 @@ Circuit::Circuit(size_t num_bits){
     for(size_t i = 0; i < num_bits; i++) {
         wires.push_back(InputWire(ReceiverTag()));
     }
+}
+
+/******************************************************************************/
+/* The fabled generate_unsigned_compare_circuit function **********************/
+/* It generates a circuit that calculates unsigned comparisons ****************/
+/******************************************************************************/
+
+// Derived from the following haskell
+/*
+mkManualLessThan size = output where
+    primitive f i = Function f (Input False i) (Input True i)
+    lessthans = map (primitive (<)) [size-1,size-2..0]
+    xnors = Constant True : map (primitive ((not .) . xor)) [size-1,size-2..0]
+    intermediate1 = Constant True : zipWith (Function (&&)) intermediate1 (tail xnors)
+    intermediate2 = zipWith3 (\x y z -> (Function (&&) x (Function (&&) y z))) lessthans xnors intermediate1
+    output = foldr (Function (||)) (Constant False) intermediate2
+*/
+
+Circuit generate_unsigned_compare_circuit(size_t num_bits) {
+    Circuit unsigned_compare { num_bits };
+    uint8_t and_table      = 0b1000;
+    uint8_t false_table    = 0b0000;
+    uint8_t lessthan_table = 0b0010;
+    uint8_t or_table       = 0b1110;
+    uint8_t true_table     = 0b1111;
+    uint8_t xnor_table     = 0b1001;
+
+#define SENDER_BIT(k) (k)
+#define RECVER_BIT(k) (num_bits + (k))
+    size_t i, tmp;
+    vector<size_t> lessthans;
+    for(i=0; i<num_bits; i++) {
+        lessthans.push_back(unsigned_compare.add_gate(lessthan_table, SENDER_BIT(i), RECVER_BIT(i)));
+    }
+    vector<size_t> xnors;
+    xnors.push_back(unsigned_compare.add_gate(true_table, 0, 0));
+    for(i=num_bits-1; i!=(size_t)-1; i--) {
+        xnors.push_back(unsigned_compare.add_gate(xnor_table, SENDER_BIT(i), RECVER_BIT(i)));
+    }
+
+    vector<size_t> intermediate1;
+    intermediate1.push_back(unsigned_compare.add_gate(true_table, 0, 0));
+    for(i=1; i<num_bits; i++) {
+        intermediate1.push_back(unsigned_compare.add_gate(and_table, intermediate1[i-1], xnors[i]));
+    }
+
+    vector<size_t> intermediate2;
+    for(i=0; i<num_bits; i++) {
+        tmp = unsigned_compare.add_gate(and_table, lessthans[i], xnors[i]);
+        intermediate2.push_back(unsigned_compare.add_gate(and_table, tmp, intermediate1[i]));
+    }
+
+    tmp = unsigned_compare.add_gate(false_table, 0, 0);
+    for(i=0; i<num_bits; i++) {
+        tmp = unsigned_compare.add_gate(or_table, intermediate2[i], tmp);
+    }
+
+    unsigned_compare.mark_as_output(tmp);
+
+#undef SENDER_BIT
+#undef RECVER_BIT
+    return unsigned_compare;
 }
 
 /******************************************************************************/

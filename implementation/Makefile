@@ -2,7 +2,7 @@
 
 MITIGATIONS=-fstack-protector-all -D_FORTIFY_SOURCE=2 -fPIC -Wl,-zrelro,-znow
 
-CCFLAGS=-O2 ${MITIGATIONS} -std=c++11 -Wall -Wextra -pedantic -Werror
+CCFLAGS=-O2 ${MITIGATIONS} -std=c++1y -Wall -Wextra -pedantic -Werror
 
 all: bin/yaoprotocol
 
