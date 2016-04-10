@@ -8,6 +8,7 @@
 
 #include "utils.h"
 
+using namespace boost;
 using namespace std;
 
 typedef std::vector<uint8_t> bytevector;
@@ -31,18 +32,50 @@ class TerriblyInsecureObliviousTransfer {
     }
 };
 
+struct SenderTag {};
+struct ReceiverTag {};
+
+struct InputWire {
+    InputWire(variant<SenderTag, ReceiverTag> who_) : who(who_) {}
+    variant<SenderTag, ReceiverTag> who;
+};
+struct GateWire {
+    GateWire(uint8_t truth_table_, size_t l_, size_t r_) : truth_table(truth_table_), l(l_), r(r_) {}
+    uint8_t truth_table; size_t l; size_t r;
+};
+struct OutputWire {
+    OutputWire(size_t index_) : index(index_) {}
+    size_t index;
+};
+typedef variant<InputWire, GateWire, OutputWire> Wire;
+
+
 /******************************************************************************/
 /* Circuit class **************************************************************/
 /******************************************************************************/
-class Circuit{
+class Circuit {
 private:
-    int num_bits;
+    size_t num_bits;
+    vector<Wire> wires;
 public:
-    Circuit(int num_bits);
+    Circuit(size_t num_bits);
+    size_t add_gate(uint8_t truth_table, size_t l, size_t r) {
+        wires.push_back(GateWire(truth_table, l, r));
+        return wires.size() - 1;
+    }
+    void mark_as_output(size_t index) {
+        wires.push_back(OutputWire(index));
+    }
 };
 
-Circuit::Circuit(int num_bits){
+Circuit::Circuit(size_t num_bits){
     this->num_bits = num_bits;
+    for(size_t i = 0; i < num_bits; i++) {
+        wires.push_back(InputWire(SenderTag()));
+    }
+    for(size_t i = 0; i < num_bits; i++) {
+        wires.push_back(InputWire(ReceiverTag()));
+    }
 }
 
 /******************************************************************************/
@@ -52,9 +85,9 @@ class SenderEvaluator{
 private:
     Circuit ungarbled_circuit;
     Circuit garbled_circuit;
-    int num_bits;
+    size_t num_bits;
 public:
-    SenderEvaluator(int num_bits);
+    SenderEvaluator(size_t num_bits);
     void execute_protocol(int sd);
     void send_garbled_tables(int sd);
     void send_sender_inputs(int sd);
@@ -62,7 +95,7 @@ public:
     void serve_wires(int sd);
 };
 
-SenderEvaluator::SenderEvaluator(int num_bits) : ungarbled_circuit(num_bits), garbled_circuit(num_bits) {
+SenderEvaluator::SenderEvaluator(size_t num_bits) : ungarbled_circuit(num_bits), garbled_circuit(num_bits) {
     this->num_bits = num_bits;
 }
 
@@ -96,7 +129,7 @@ class ReceiverEvaluator{
 private:
     Circuit garbled_circuit;
 public:
-    ReceiverEvaluator(int num_bits);
+    ReceiverEvaluator(size_t num_bits);
     void execute_protocol(int sd);
     void receive_garbled_tables(int sd);
     void receive_sender_inputs(int sd);
@@ -104,7 +137,7 @@ public:
     void request_wires(int sd, int index, int bit);
 };
 
-ReceiverEvaluator::ReceiverEvaluator(int num_bits) : garbled_circuit(num_bits) {
+ReceiverEvaluator::ReceiverEvaluator(size_t num_bits) : garbled_circuit(num_bits) {
 }
 
 void ReceiverEvaluator::execute_protocol(int sd){
