@@ -12,6 +12,32 @@ using namespace boost;
 using namespace std;
 
 typedef std::vector<uint8_t> bytevector;
+typedef std::vector<bool> bitvector;
+
+bitvector unpack_bv(bytevector x) {
+    bitvector y;
+    for(uint8_t a : x) {
+        for(uint8_t i=0; i<8;i++) {
+            y.push_back(!!((a & (1 << i)) >> i));
+        }
+    }
+    return y;
+}
+
+bytevector pack_bv(bitvector x) {
+    bytevector y;
+    uint8_t tmp=0, i=0;
+    for(bool a : x) {
+        tmp |= a;
+        tmp <<= 1;
+        if(++i == 8) {
+            y.push_back(tmp);
+            tmp = i = 0;
+        }
+    }
+    if(i != 0) { y.push_back(tmp); }
+    return y;
+}
 
 // placeholder naive implementation for testing
 class TerriblyInsecureObliviousTransfer {
@@ -62,10 +88,10 @@ typedef variant<InputWire, GateWire, OutputWire> Wire;
 /* Circuit class **************************************************************/
 /******************************************************************************/
 class Circuit {
-private:
+public:
     size_t num_bits;
     vector<Wire> wires;
-public:
+
     Circuit(size_t num_bits);
     size_t add_gate(uint8_t truth_table, size_t l, size_t r) {
         wires.push_back(GateWire(truth_table, l, r));
@@ -85,6 +111,25 @@ Circuit::Circuit(size_t num_bits){
         wires.push_back(InputWire(ReceiverTag()));
     }
 }
+
+/*bytevector eval_circuit(Circuit c, bytevector x_, bytevector y_) {
+    bitvector result;
+    struct eval_wire : public static_visitor<> {
+        bitvector* output;
+        bitvector x, y;
+        eval_wire(bitvector* out, bitvector x_, bitvector y_) : output(o), x(x_), y(y_) {}
+        bool operator()(InputWire& w) {
+            if(w.who.get<SenderTag>()) {
+            } else {
+            }
+        };
+    } eval_wire(&result, bv_unpack(x_), bv_unpack(y_));
+    size_t i;
+    for(i=0; i<c.wires.size(); i++) {
+        tmp[i] = apply_visitor(eval_wire, c.wires[i]);
+    }
+    return bv_pack(result);
+}*/
 
 /******************************************************************************/
 /* The fabled generate_unsigned_compare_circuit function **********************/
