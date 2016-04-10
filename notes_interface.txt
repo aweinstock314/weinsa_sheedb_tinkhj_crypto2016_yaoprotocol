@@ -1,12 +1,13 @@
 yp [client/sender|server/receiver]
-yp receiver port botwealth
-yp sender hostnameport alicewealth
+yp receiver port inputsize botwealth
+yp sender hostname port inputsize alicewealth
 
 index = size_t
 byte = uint8_t
 bytestring = vector<uint8_t>
 
 class Circuit: //Container for gates, constructor takes input length in bits
+    // first inputsize*2 gates are pseudogates that represent input bits
 	index add_gate(byte truthtable, index left, index right)
 	//bytestring get_garbled_circuit()
 	void mark_as_output(index gate)
