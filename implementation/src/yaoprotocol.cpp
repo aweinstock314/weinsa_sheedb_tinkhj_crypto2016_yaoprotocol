@@ -48,10 +48,54 @@ class SenderEvaluator{
 private:
 	Circuit ungarbled_circuit;
 	Circuit garbled_circuit;
+	int num_bits;
 public:
 	SenderEvaluator(int num_bits);
+	void executeProtocol(int sd);
+	void sendGarbledTables(int sd);
+	void sendSenderInputs(int sd);
+	void sendOutputs(int sd);
+	void serveWires(int sd);
 };
 
+SenderEvaluator::SenderEvaluator(int num_bits){
+	this.num_bits = num_bits;
+	this.ungarbled_circuit = Circuit(num_bits);
+}
+
+void SenderEvaluator::executeProtocol(int sd){
+	this.sendGarbledTables(sd);
+	this.sendSenderInputs(sd);
+	this.sendOutputs(sd);
+	this.serveWires(sd);
+}
+
+void SenderEvaluator::sendGarbledTables(int sd){
+	cout << "I'M SENDING GARBLED TABLES NOW " << sd << endl;
+}
+
+void SenderEvaluator::sendSenderInputs(int sd){
+	cout << "I'M SENDING MY INPUTS NOW " << sd << endl;
+}
+
+void SenderEvaluator::sendOutputs(int sd){
+	cout << "I'M SENDING OUTPUTS NOW " << sd << endl;
+}
+
+void SenderEvaluator::serveWires(int sd){
+	cout << "I'M SERVING WIRES NOW " << sd << endl;
+}
+
+/******************************************************************************/
+/* ReceiverEvaluator class ****************************************************/
+/******************************************************************************/
+class ReceiverEvaluator{
+	
+};
+
+/******************************************************************************/
+/* Main ***********************************************************************/
+/******************************************************************************/
 int main(int argc, char** argv) {
     // silence -Wunused-parameter for skeleton
     (void)argc; (void)argv;
