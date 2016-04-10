@@ -11,5 +11,30 @@ class Circuit: //Container for gates, constructor takes input length in bits
 	index add_gate(byte truthtable, index left, index right)
 	//bytestring get_garbled_circuit()
 	void mark_as_output(index gate)
-	bytestring run_sender(int sd, bytestring aliceinput)
-	bytestring run_receiver(int fd, bytestring bobinput)
+	//bytestring run_sender(int fd, bytestring aliceinput)
+	//bytestring run_receiver(int fd, bytestring bobinput)
+    Evaluator make_evaluator()
+
+class Evaluator:
+    // is (statically, CRTP) polymorphic over circuit impls/OT impls
+    // has a circuit description, has fields for randomized bits/wires
+    // random wires are
+    //   initialized to random in sender
+    //   initialized to zero in receiver
+    //   populated by OT in receiver
+    // sender keeps track of what wires receiver asked for (abort on double-ask?)
+    // possibly have SenderEvaluator/ReceiverEvaluator?
+    to be called by sender:
+        void send_garbled_tables(fd)
+        void send_sender_wires(fd)
+        void send_output_wires(fd)
+        void serve_wires(fd)
+    to be called by receiver:
+        void receive_garbled_tables(fd)
+        void receive_sender_wires(fd)
+        void receive_output_wires(fd)
+        void request_wire(fd, index, bit)
+
+class ObliviousTransfer:
+    static void send(bytestring, bytestring)
+    static bytestring receive(bit)
