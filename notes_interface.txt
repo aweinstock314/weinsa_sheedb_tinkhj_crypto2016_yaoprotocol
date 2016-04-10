@@ -1,0 +1,14 @@
+yp [client/sender|server/receiver]
+yp receiver port botwealth
+yp sender hostnameport alicewealth
+
+index = size_t
+byte = uint8_t
+bytestring = vector<uint8_t>
+
+class Circuit: //Container for gates, constructor takes input length in bits
+	index add_gate(byte truthtable, index left, index right)
+	//bytestring get_garbled_circuit()
+	void mark_as_output(index gate)
+	bytestring run_sender(int sd, bytestring aliceinput)
+	bytestring run_receiver(int fd, bytestring bobinput)
