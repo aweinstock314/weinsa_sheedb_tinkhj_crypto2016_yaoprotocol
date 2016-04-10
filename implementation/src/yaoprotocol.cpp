@@ -51,11 +51,11 @@ private:
 	int num_bits;
 public:
 	SenderEvaluator(int num_bits);
-	void executeProtocol(int sd);
-	void sendGarbledTables(int sd);
-	void sendSenderInputs(int sd);
-	void sendOutputs(int sd);
-	void serveWires(int sd);
+	void execute_protocol(int sd);
+	void send_garbled_tables(int sd);
+	void send_sender_inputs(int sd);
+	void send_outputs(int sd);
+	void serve_wires(int sd);
 };
 
 SenderEvaluator::SenderEvaluator(int num_bits){
@@ -63,26 +63,26 @@ SenderEvaluator::SenderEvaluator(int num_bits){
 	this.ungarbled_circuit = Circuit(num_bits);
 }
 
-void SenderEvaluator::executeProtocol(int sd){
+void SenderEvaluator::execute_protocol(int sd){
 	this.sendGarbledTables(sd);
 	this.sendSenderInputs(sd);
 	this.sendOutputs(sd);
 	this.serveWires(sd);
 }
 
-void SenderEvaluator::sendGarbledTables(int sd){
+void SenderEvaluator::send_garbled_tables(int sd){
 	cout << "I'M SENDING GARBLED TABLES NOW " << sd << endl;
 }
 
-void SenderEvaluator::sendSenderInputs(int sd){
+void SenderEvaluator::send_sender_inputs(int sd){
 	cout << "I'M SENDING MY INPUTS NOW " << sd << endl;
 }
 
-void SenderEvaluator::sendOutputs(int sd){
+void SenderEvaluator::send_outputs(int sd){
 	cout << "I'M SENDING OUTPUTS NOW " << sd << endl;
 }
 
-void SenderEvaluator::serveWires(int sd){
+void SenderEvaluator::serve_wires(int sd){
 	cout << "I'M SERVING WIRES NOW " << sd << endl;
 }
 
@@ -90,7 +90,7 @@ void SenderEvaluator::serveWires(int sd){
 /* ReceiverEvaluator class ****************************************************/
 /******************************************************************************/
 class ReceiverEvaluator{
-	
+
 };
 
 /******************************************************************************/
