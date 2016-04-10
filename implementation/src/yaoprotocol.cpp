@@ -6,6 +6,8 @@
 
 #include "utils.h"
 
+using namespace std;
+
 typedef std::vector<uint8_t> bytevector;
 
 // placeholder naive implementation for testing
@@ -24,8 +26,6 @@ class TerriblyInsecureObliviousTransfer {
         read_aon(fd, (char*)y.data(), len);
         return bit ? y : x;
     }
-
-using namespace std;
 
 /******************************************************************************/
 /* Circuit class **************************************************************/
@@ -90,8 +90,43 @@ void SenderEvaluator::serve_wires(int sd){
 /* ReceiverEvaluator class ****************************************************/
 /******************************************************************************/
 class ReceiverEvaluator{
-
+private:
+	Circuit garbled_circuit;
+public:
+	ReceiverEvaluator(int num_bits);
+	void execute_protocol(int sd);
+	void receive_garbled_tables(int sd);
+	void receive_sender_inputs(int sd);
+	void receive_outputs(int sd);
+	void request_wires(int sd, int index, int bit);
 };
+
+ReceiverEvaluator::ReceiverEvaluator(int num_bits){
+	this->garbled_circuit = Circuit(num_bits);
+}
+
+ReceiverEvaluator::execute_protocol(int sd){
+	this->receive_garbled_tables(sd);
+	this->receive_sender_inputs(sd);
+	this->receive_outputs(sd);
+	this->request_wires(sd, 0, 0);
+}
+
+ReceiverEvaluator::receive_garbled_tables(int sd){
+	cout << "I'M RECEIVING GARBLED TABLES NOW " << sd << endl;
+}
+
+ReceiverEvaluator::receive_sender_inputs(int sd){
+	cout << "I'M RECEIVING INPUTS NOW " << sd << endl;
+}
+
+ReceiverEvaluator::receive_outputs(int sd){
+	cout << "I'M RECEIVING OUTPUTS NOW " << sd << endl;
+}
+
+ReceiverEvaluator::request_wires(int sd, int index, int bit){
+	cout << "I'M REQUESTING WIRES NOW " << sd << " " << index << " " << bit << endl;
+}
 
 /******************************************************************************/
 /* Main ***********************************************************************/
