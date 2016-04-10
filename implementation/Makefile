@@ -6,7 +6,7 @@ CCFLAGS=-O2 ${MITIGATIONS} -std=c++11 -Wall -Wextra -pedantic -Werror
 
 all: bin/yaoprotocol
 
-bin/yaoprotocol: src/yaoprotocol.cpp
+bin/yaoprotocol: src/yaoprotocol.cpp src/utils.h src/utils.cpp
 	mkdir -p bin
 	g++ ${CCFLAGS} $< -o $@ -lcryptopp
 
