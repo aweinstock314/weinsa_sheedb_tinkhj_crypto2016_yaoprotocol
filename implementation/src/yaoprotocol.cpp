@@ -453,6 +453,28 @@ int receiver_main(int, char** argv) {
     return 0;
 }
 
+int evaluator_main(int, char** argv) {
+    // TODO: arbitrary precision integers
+    uint64_t wealth1_ = (uint64_t) atoi(argv[2]);
+    uint64_t wealth2_ = (uint64_t) atoi(argv[3]);
+    bytevector wealth1, wealth2;
+    uint8_t* p;
+    size_t i;
+    for(i=0, p=(uint8_t*)&wealth1_; i < sizeof(wealth1_); ++i, ++p) {
+        wealth1.push_back(wealth1_);
+    }
+    for(i=0, p=(uint8_t*)&wealth2_; i < sizeof(wealth2_); ++i, ++p) {
+        wealth2.push_back(wealth2_);
+    }
+    Circuit c = generate_unsigned_compare_circuit(8*min(wealth1.size(), wealth2.size()));
+    bytevector result = eval_circuit(c, wealth1, wealth2);
+    cout << result.size() << endl;
+    for(i=0; i<result.size(); ++i) {
+        printf("result[%lu]: %hhu\n", i, result[i]);
+    }
+    return 0;
+}
+
 int main(int argc, char** argv) {
     auto print_sender_usage = [&]() {
         cout << "Usage is " << argv[0] << " sender <hostname> <port> <wealth>" << endl;
@@ -460,18 +482,23 @@ int main(int argc, char** argv) {
     auto print_receiver_usage = [&]() {
         cout << "Usage is " << argv[0] << " receiver <port> <wealth>" << endl;
     };
+    auto print_evaluator_usage = [&]() {
+        cout << "Usage is " << argv[0] << " evaluator <wealth1> <wealth2>" << endl;
+    };
 
     auto print_usage = [&]() {
         print_sender_usage();
         cout << "OR" << endl;
         print_receiver_usage();
+        cout << "OR" << endl;
+        print_evaluator_usage();
     };
 
-    //Argument verification and parsing
-    if(argc != 4 && argc != 5){
+    if(argc < 2) {
         print_usage();
         return EXIT_FAILURE;
     }
+
     if(!strcmp("sender", argv[1])) {
         if(argc != 5) {
             print_sender_usage();
@@ -488,6 +515,14 @@ int main(int argc, char** argv) {
             return receiver_main(argc, argv);
         }
     }
+    if(!strcmp("evaluator", argv[1])) {
+        if(argc != 4) {
+            print_evaluator_usage();
+            return EXIT_FAILURE;
+        } else {
+            return evaluator_main(argc, argv);
+        }
+    };
 
     print_usage();
     return EXIT_FAILURE;
