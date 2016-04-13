@@ -116,24 +116,75 @@ Circuit::Circuit(size_t num_bits){
     }
 }
 
-/*bytevector eval_circuit(Circuit c, bytevector x_, bytevector y_) {
+bool eval_truthtable(uint8_t table, bool x, bool y) {
+    /*
+    x y t
+    0 0 a LSB
+    0 1 b
+    1 0 c
+    1 1 d
+    */
+    uint8_t x_ = x ? BOOST_BINARY(1100) : BOOST_BINARY(0011);
+    uint8_t y_ = y ? BOOST_BINARY(1010) : BOOST_BINARY(0101);
+    return table & x_ & y_;
+}
+
+struct eval_wire : public static_visitor<> {
+    typedef bool result_type;
+    Circuit *c;
+    bitvector *result;
+    bitvector *x, *y;
+    bitvector *tempwires, *evalflags;
+    size_t i;
+    eval_wire(Circuit* c_, bitvector* res, bitvector* x_, bitvector* y_, bitvector* tw, bitvector* ef, size_t i_) :
+        c(c_), result(res), x(x_), y(y_), tempwires(tw), evalflags(ef), i(i_) {}
+    void mark_evaluated(size_t j, bool b) {
+        (*tempwires)[j] = b;
+        (*evalflags)[j] = 1;
+    }
+    bool recursive_eval(size_t j) {
+        size_t tmp = i;
+        i = j;
+        bool b = (*evalflags)[i] ? (*tempwires)[i] : apply_visitor((*this), c->wires[i]);
+        mark_evaluated(j, b);
+        i = tmp;
+        return b;
+    }
+    bool operator()(InputWire& w) {
+        SenderTag * tmp = get<SenderTag>(&w.who);
+        bool b = (tmp != nullptr) ? (*x)[i] : (*y)[i];
+        mark_evaluated(i, b);
+        return b;
+    };
+    bool operator()(GateWire& w) {
+        if((*evalflags)[i]) {
+            return (*tempwires)[i];
+        } else {
+            bool l = recursive_eval(w.l);
+            bool r = recursive_eval(w.r);
+            bool b = eval_truthtable(w.truth_table, l, r);
+            mark_evaluated(i, b);
+            return b;
+        }
+    }
+    bool operator()(OutputWire& w) {
+        return (*result)[i] = recursive_eval(w.index);
+    }
+};
+bytevector eval_circuit(Circuit c, bytevector x_, bytevector y_) {
     bitvector result;
-    struct eval_wire : public static_visitor<> {
-        bitvector* output;
-        bitvector x, y;
-        eval_wire(bitvector* out, bitvector x_, bitvector y_) : output(o), x(x_), y(y_) {}
-        bool operator()(InputWire& w) {
-            if(w.who.get<SenderTag>()) {
-            } else {
-            }
-        };
-    } eval_wire(&result, bv_unpack(x_), bv_unpack(y_));
+    bitvector x, y;
+    bitvector tempwires(c.wires.size(), 0);
+    bitvector evalflags(c.wires.size(), 0);
+    x = unpack_bv(x_);
+    y = unpack_bv(y_);
     size_t i;
     for(i=0; i<c.wires.size(); i++) {
-        tmp[i] = apply_visitor(eval_wire, c.wires[i]);
+        auto ew = eval_wire(&c, &result, &x, &y, &tempwires, &evalflags, i);
+        apply_visitor(ew, c.wires[i]);
     }
-    return bv_pack(result);
-}*/
+    return pack_bv(result);
+}
 
 /******************************************************************************/
 /* The fabled generate_unsigned_compare_circuit function **********************/
