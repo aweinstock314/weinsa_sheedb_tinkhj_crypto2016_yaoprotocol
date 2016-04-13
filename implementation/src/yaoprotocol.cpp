@@ -74,7 +74,8 @@ struct SenderTag {};
 struct ReceiverTag {};
 
 struct InputWire {
-    InputWire(variant<SenderTag, ReceiverTag> who_) : who(who_) {}
+    InputWire(size_t i, variant<SenderTag, ReceiverTag> who_) : index(i), who(who_) {}
+    size_t index;
     variant<SenderTag, ReceiverTag> who;
 };
 struct GateWire {
@@ -109,10 +110,10 @@ public:
 Circuit::Circuit(size_t num_bits){
     this->num_bits = num_bits;
     for(size_t i = 0; i < num_bits; i++) {
-        wires.push_back(InputWire(SenderTag()));
+        wires.push_back(InputWire(i, SenderTag()));
     }
     for(size_t i = 0; i < num_bits; i++) {
-        wires.push_back(InputWire(ReceiverTag()));
+        wires.push_back(InputWire(i, ReceiverTag()));
     }
 }
 
@@ -151,8 +152,19 @@ struct eval_wire : public static_visitor<> {
         return b;
     }
     bool operator()(InputWire& w) {
-        SenderTag * tmp = get<SenderTag>(&w.who);
-        bool b = (tmp != nullptr) ? (*x)[i] : (*y)[i];
+        struct matcher : static_visitor<> {
+            typedef bool result_type;
+            bitvector *x, *y;
+            InputWire &w;
+            matcher(bitvector *x_, bitvector *y_, InputWire& w_) : x(x_), y(y_), w(w_) {}
+            bool operator()(SenderTag&) {
+                return (*x)[w.index];
+            }
+            bool operator()(ReceiverTag&) {
+                return (*y)[w.index];
+            }
+        } m(x,y,w);
+        bool b = apply_visitor(m, w.who);
         mark_evaluated(i, b);
         return b;
     };
@@ -168,7 +180,9 @@ struct eval_wire : public static_visitor<> {
         }
     }
     bool operator()(OutputWire& w) {
-        return (*result)[i] = recursive_eval(w.index);
+        bool b = recursive_eval(w.index);
+        result->push_back(b);
+        return b;
     }
 };
 bytevector eval_circuit(Circuit c, bytevector x_, bytevector y_) {
@@ -334,8 +348,111 @@ void ReceiverEvaluator::request_wires(int sd, int index, int bit){
 }
 
 /******************************************************************************/
-/* Main ***********************************************************************/
+/* Mains **********************************************************************/
 /******************************************************************************/
+
+int sender_main(int, char** argv) {
+    string hostname = argv[2];
+    unsigned short port = (unsigned short) atoi(argv[2]);
+    uint64_t wealth = (uint64_t) atoi(argv[3]);
+    (void)hostname; (void)port; (void)wealth; // suppress -Wunused-but-set-variable
+    int sd, rc;
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+    memset(&hints, 0, sizeof(struct addrinfo));
+
+    hints.ai_family = AF_UNSPEC; //IPv4 or IPv6 allowed
+    hints.ai_socktype = SOCK_STREAM; //TCP
+    hints.ai_flags = 0;
+    hints.ai_protocol = 0;
+
+    rc = getaddrinfo(argv[2], argv[3], &hints, &result);
+    if(rc != 0){
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
+        return EXIT_FAILURE;
+    }
+
+    //Try connecting to each address
+    for(rp = result; rp != NULL; rp = rp->ai_next){
+        sd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if(sd == -1){
+            continue;
+        }
+        if(connect(sd, rp->ai_addr, rp->ai_addrlen) != -1){
+            break;
+        }
+        close(sd);
+    }
+
+    if(rp == NULL){
+        cerr << "Could not connect to specified host and port" << endl;
+        return EXIT_FAILURE;
+    }
+
+    freeaddrinfo(result);
+
+    SenderEvaluator eval = SenderEvaluator(sizeof(wealth) * 8);
+    eval.execute_protocol(sd);
+    return 0;
+}
+
+int receiver_main(int, char** argv) {
+    unsigned short port = (unsigned short) atoi(argv[2]);
+    uint64_t wealth = (uint64_t) atoi(argv[3]);
+    (void)port; (void)wealth; // suppress -Wunused-but-set-variable
+    int sd, rc;
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+    memset(&hints, 0, sizeof(struct addrinfo));
+
+    int server_sd;
+    hints.ai_family = AF_UNSPEC; //IPv4 or IPv6 allowed
+    hints.ai_socktype = SOCK_STREAM; //TCP
+    hints.ai_flags = AI_PASSIVE; //Any IP
+    hints.ai_protocol = 0;
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
+
+    rc = getaddrinfo(NULL, argv[2], &hints, &result);
+    if(rc != 0){
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
+        return EXIT_FAILURE;
+    }
+
+    //Try to bind to each address
+    for(rp = result; rp != NULL; rp = rp->ai_next){
+        server_sd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if(server_sd == -1){
+            continue;
+        }
+        if(bind(server_sd, rp->ai_addr, rp->ai_addrlen) == 0){
+            break;
+        }
+        close(server_sd);
+    }
+
+    if(rp == NULL){
+        cerr << "Could not bind to specified port" << endl;
+        return EXIT_FAILURE;
+    }
+
+    freeaddrinfo(result);
+
+    rc = listen(server_sd, 1);
+    struct sockaddr_in client;
+    int fromlen = sizeof(client);
+    sd = accept(server_sd, (struct sockaddr *) &client, (socklen_t*) &fromlen);
+    if(sd < 0){
+        perror("Failed to accept connection");
+        return EXIT_FAILURE;
+    }
+
+    ReceiverEvaluator eval = ReceiverEvaluator(sizeof(wealth) * 8);
+    eval.execute_protocol(sd);
+    return 0;
+}
+
 int main(int argc, char** argv) {
     auto print_sender_usage = [&]() {
         cout << "Usage is " << argv[0] << " sender <hostname> <port> <wealth>" << endl;
@@ -344,126 +461,34 @@ int main(int argc, char** argv) {
         cout << "Usage is " << argv[0] << " receiver <port> <wealth>" << endl;
     };
 
-    //Argument verification and parsing
-    if(argc != 4 && argc != 5){
+    auto print_usage = [&]() {
         print_sender_usage();
         cout << "OR" << endl;
         print_receiver_usage();
+    };
+
+    //Argument verification and parsing
+    if(argc != 4 && argc != 5){
+        print_usage();
         return EXIT_FAILURE;
     }
-    if(argc == 5 && strcmp("sender", argv[1]) != 0){
-        print_sender_usage();
-        return EXIT_FAILURE;
-    }
-    if(argc == 4 && strcmp("receiver", argv[1]) != 0){
-        print_receiver_usage();
-        return EXIT_FAILURE;
-    }
-
-    string hostname;
-    unsigned short port;
-    uint64_t wealth;
-
-    if(argc == 4){
-        port = (unsigned short) atoi(argv[2]);
-        wealth = (uint64_t) atoi(argv[3]);
-    }
-    else{
-        hostname = argv[2];
-        port = (unsigned short) atoi(argv[3]);
-        wealth = (uint64_t) atoi(argv[4]);
-    }
-
-    (void)hostname; (void)port; (void)wealth; // suppress -Wunused-but-set-variable
-
-    int sd, rc;
-    struct addrinfo hints;
-    struct addrinfo* result, *rp;
-    memset(&hints, 0, sizeof(struct addrinfo));
-    //Sender
-    if(argc == 5){
-        hints.ai_family = AF_UNSPEC; //IPv4 or IPv6 allowed
-        hints.ai_socktype = SOCK_STREAM; //TCP
-        hints.ai_flags = 0;
-        hints.ai_protocol = 0;
-
-        rc = getaddrinfo(argv[2], argv[3], &hints, &result);
-        if(rc != 0){
-            fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
+    if(!strcmp("sender", argv[1])) {
+        if(argc != 5) {
+            print_sender_usage();
             return EXIT_FAILURE;
+        } else {
+            return sender_main(argc, argv);
         }
-
-        //Try connecting to each address
-        for(rp = result; rp != NULL; rp = rp->ai_next){
-            sd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-            if(sd == -1){
-                continue;
-            }
-            if(connect(sd, rp->ai_addr, rp->ai_addrlen) != -1){
-                break;
-            }
-            close(sd);
-        }
-
-        if(rp == NULL){
-            cerr << "Could not connect to specified host and port" << endl;
-            return EXIT_FAILURE;
-        }
-
-        freeaddrinfo(result);
-
-        SenderEvaluator eval = SenderEvaluator(sizeof(wealth) * 8);
-        eval.execute_protocol(sd);
     }
-    //Receiver
-    else{
-        int server_sd;
-        hints.ai_family = AF_UNSPEC; //IPv4 or IPv6 allowed
-        hints.ai_socktype = SOCK_STREAM; //TCP
-        hints.ai_flags = AI_PASSIVE; //Any IP
-        hints.ai_protocol = 0;
-        hints.ai_canonname = NULL;
-        hints.ai_addr = NULL;
-        hints.ai_next = NULL;
-
-        int rc = getaddrinfo(NULL, argv[2], &hints, &result);
-        if(rc != 0){
-            fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
+    if(!strcmp("receiver", argv[1])) {
+        if(argc != 4) {
+            print_receiver_usage();
             return EXIT_FAILURE;
+        } else {
+            return receiver_main(argc, argv);
         }
-
-        //Try to bind to each address
-        for(rp = result; rp != NULL; rp = rp->ai_next){
-            server_sd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-            if(server_sd == -1){
-                continue;
-            }
-            if(bind(server_sd, rp->ai_addr, rp->ai_addrlen) == 0){
-                break;
-            }
-            close(server_sd);
-        }
-
-        if(rp == NULL){
-            cerr << "Could not bind to specified port" << endl;
-            return EXIT_FAILURE;
-        }
-
-        freeaddrinfo(result);
-
-        rc = listen(server_sd, 1);
-        struct sockaddr_in client;
-        int fromlen = sizeof(client);
-        sd = accept(server_sd, (struct sockaddr *) &client, (socklen_t*) &fromlen);
-        if(sd < 0){
-            perror("Failed to accept connection");
-            return EXIT_FAILURE;
-        }
-
-        ReceiverEvaluator eval = ReceiverEvaluator(sizeof(wealth) * 8);
-        eval.execute_protocol(sd);
     }
 
-    printf("TODO: everything\n");
-    return 0;
+    print_usage();
+    return EXIT_FAILURE;
 }
