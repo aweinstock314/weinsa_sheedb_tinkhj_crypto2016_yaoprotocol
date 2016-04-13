@@ -1,9 +1,13 @@
+#include <boost/utility/binary.hpp>
 #include <boost/variant.hpp>
 #include <iostream>
+#include <netdb.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <string>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <vector>
 
 #include "utils.h"
@@ -149,12 +153,12 @@ mkManualLessThan size = output where
 
 Circuit generate_unsigned_compare_circuit(size_t num_bits) {
     Circuit unsigned_compare { num_bits };
-    uint8_t and_table      = 0b1000;
-    uint8_t false_table    = 0b0000;
-    uint8_t lessthan_table = 0b0010;
-    uint8_t or_table       = 0b1110;
-    uint8_t true_table     = 0b1111;
-    uint8_t xnor_table     = 0b1001;
+    uint8_t and_table      = BOOST_BINARY(1000);
+    uint8_t false_table    = BOOST_BINARY(0000);
+    uint8_t lessthan_table = BOOST_BINARY(0010);
+    uint8_t or_table       = BOOST_BINARY(1110);
+    uint8_t true_table     = BOOST_BINARY(1111);
+    uint8_t xnor_table     = BOOST_BINARY(1001);
 
 #define SENDER_BIT(k) (k)
 #define RECVER_BIT(k) (num_bits + (k))
@@ -294,15 +298,15 @@ int main(int argc, char** argv) {
         print_sender_usage();
         cout << "OR" << endl;
         print_receiver_usage();
-        return 1;
+        return EXIT_FAILURE;
     }
     if(argc == 5 && strcmp("sender", argv[1]) != 0){
         print_sender_usage();
-        return 1;
+        return EXIT_FAILURE;
     }
     if(argc == 4 && strcmp("receiver", argv[1]) != 0){
         print_receiver_usage();
-        return 1;
+        return EXIT_FAILURE;
     }
 
     string hostname;
@@ -320,6 +324,94 @@ int main(int argc, char** argv) {
     }
 
     (void)hostname; (void)port; (void)wealth; // suppress -Wunused-but-set-variable
+
+    int sd, rc;
+    struct addrinfo hints;
+    struct addrinfo* result, *rp;
+    memset(&hints, 0, sizeof(struct addrinfo));
+    //Sender
+    if(argc == 5){
+        hints.ai_family = AF_UNSPEC; //IPv4 or IPv6 allowed
+        hints.ai_socktype = SOCK_STREAM; //TCP
+        hints.ai_flags = 0;
+        hints.ai_protocol = 0;
+
+        rc = getaddrinfo(argv[2], argv[3], &hints, &result);
+        if(rc != 0){
+            fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
+            return EXIT_FAILURE;
+        }
+
+        //Try connecting to each address
+        for(rp = result; rp != NULL; rp = rp->ai_next){
+            sd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+            if(sd == -1){
+                continue;
+            }
+            if(connect(sd, rp->ai_addr, rp->ai_addrlen) != -1){
+                break;
+            }
+            close(sd);
+        }
+
+        if(rp == NULL){
+            cerr << "Could not connect to specified host and port" << endl;
+            return EXIT_FAILURE;
+        }
+
+        freeaddrinfo(result);
+
+        SenderEvaluator eval = SenderEvaluator(sizeof(wealth) * 8);
+        eval.execute_protocol(sd);
+    }
+    //Receiver
+    else{
+        int server_sd;
+        hints.ai_family = AF_UNSPEC; //IPv4 or IPv6 allowed
+        hints.ai_socktype = SOCK_STREAM; //TCP
+        hints.ai_flags = AI_PASSIVE; //Any IP
+        hints.ai_protocol = 0;
+        hints.ai_canonname = NULL;
+        hints.ai_addr = NULL;
+        hints.ai_next = NULL;
+
+        int rc = getaddrinfo(NULL, argv[2], &hints, &result);
+        if(rc != 0){
+            fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
+            return EXIT_FAILURE;
+        }
+
+        //Try to bind to each address
+        for(rp = result; rp != NULL; rp = rp->ai_next){
+            server_sd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+            if(server_sd == -1){
+                continue;
+            }
+            if(bind(server_sd, rp->ai_addr, rp->ai_addrlen) == 0){
+                break;
+            }
+            close(server_sd);
+        }
+
+        if(rp == NULL){
+            cerr << "Could not bind to specified port" << endl;
+            return EXIT_FAILURE;
+        }
+
+        freeaddrinfo(result);
+
+        rc = listen(server_sd, 1);
+        struct sockaddr_in client;
+        int fromlen = sizeof(client);
+        sd = accept(server_sd, (struct sockaddr *) &client, (socklen_t*) &fromlen);
+        if(sd < 0){
+            perror("Failed to accept connection");
+            return EXIT_FAILURE;
+        }
+
+        ReceiverEvaluator eval = ReceiverEvaluator(sizeof(wealth) * 8);
+        eval.execute_protocol(sd);
+    }
 
     printf("TODO: everything\n");
     return 0;
