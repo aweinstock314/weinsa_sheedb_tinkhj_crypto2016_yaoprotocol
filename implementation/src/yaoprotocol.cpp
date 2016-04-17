@@ -1,3 +1,4 @@
+#include <bitset>
 #include <boost/utility/binary.hpp>
 #include <boost/variant.hpp>
 #include <iostream>
@@ -21,8 +22,8 @@ typedef std::vector<bool> bitvector;
 bitvector unpack_bv(bytevector x) {
     bitvector y;
     for(uint8_t a : x) {
-        for(uint8_t i=0; i<8;i++) {
-            y.push_back(!!((a & (1 << i)) >> i));
+        for(int i = 0; i < 8; i++){
+            y.push_back( !!( (a & (1 << i)) >> i) );
         }
     }
     return y;
@@ -32,8 +33,7 @@ bytevector pack_bv(bitvector x) {
     bytevector y;
     uint8_t tmp=0, i=0;
     for(bool a : x) {
-        tmp |= a;
-        tmp <<= 1;
+        tmp |= (a << i);
         if(++i == 8) {
             y.push_back(tmp);
             tmp = i = 0;
@@ -455,23 +455,52 @@ int receiver_main(int, char** argv) {
 
 int evaluator_main(int, char** argv) {
     // TODO: arbitrary precision integers
-    uint64_t wealth1_ = (uint64_t) atoi(argv[2]);
-    uint64_t wealth2_ = (uint64_t) atoi(argv[3]);
+    uint64_t wealth1_ = (uint64_t) stoull(argv[2]);
+    uint64_t wealth2_ = (uint64_t) stoull(argv[3]);
     bytevector wealth1, wealth2;
     uint8_t* p;
     size_t i;
     for(i=0, p=(uint8_t*)&wealth1_; i < sizeof(wealth1_); ++i, ++p) {
-        wealth1.push_back(wealth1_);
+        wealth1.push_back(*p);
     }
     for(i=0, p=(uint8_t*)&wealth2_; i < sizeof(wealth2_); ++i, ++p) {
-        wealth2.push_back(wealth2_);
+        wealth2.push_back(*p);
     }
-    Circuit c = generate_unsigned_compare_circuit(8*min(wealth1.size(), wealth2.size()));
+    Circuit c = generate_unsigned_compare_circuit(8*max(wealth1.size(), wealth2.size()));
     bytevector result = eval_circuit(c, wealth1, wealth2);
     cout << result.size() << endl;
     for(i=0; i<result.size(); ++i) {
         printf("result[%lu]: %hhu\n", i, result[i]);
     }
+    return 0;
+}
+
+int test_main(int, char**){
+    cout << "Tests byte vector packing/unpacking" << endl;
+    bytevector byv;
+    byv.push_back(uint8_t(0));
+    byv.push_back(uint8_t(1));
+    cout << bitset<8>(byv[0]) << " " << bitset<8>(byv[1]) <<endl;
+    bitvector biv = unpack_bv(byv);
+    unsigned int i = 0;
+    for(i = 0; i < biv.size(); i++){
+        cout << biv[i];
+    }
+    cout << endl;
+    byv = pack_bv(biv);
+    cout << bitset<8>(byv[0]) << " " << bitset<8>(byv[1]) << endl;
+    cout << "Another number" << endl;
+    byv.clear();
+    byv.push_back(uint8_t(252));
+    byv.push_back(uint8_t(0));
+    cout << bitset<8>(byv[0]) << " " << bitset<8>(byv[1]) <<endl;
+    biv = unpack_bv(byv);
+    for(i = 0; i < biv.size(); i++){
+        cout << biv[i];
+    }
+    cout << endl;
+    byv = pack_bv(biv);
+    cout << bitset<8>(byv[0]) << " " << bitset<8>(byv[1]) << endl;
     return 0;
 }
 
@@ -523,6 +552,9 @@ int main(int argc, char** argv) {
             return evaluator_main(argc, argv);
         }
     };
+    if(!strcmp("test", argv[1])){
+        return test_main(argc, argv);
+    }
 
     print_usage();
     return EXIT_FAILURE;

@@ -25,6 +25,5 @@ def try_random_inputs(howmany, maxval):
             print('---')
 
 if __name__ == '__main__':
-    try_random_inputs(1000, 100)
     try_random_inputs(1000, 2**8)
     try_random_inputs(1000, 2**64)
