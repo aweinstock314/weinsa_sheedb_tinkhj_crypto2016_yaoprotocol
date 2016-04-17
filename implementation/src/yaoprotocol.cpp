@@ -229,7 +229,7 @@ Circuit generate_unsigned_compare_circuit(size_t num_bits) {
 #define RECVER_BIT(k) (num_bits + (k))
     size_t i, tmp;
     vector<size_t> lessthans;
-    for(i=0; i<num_bits; i++) {
+    for(i=num_bits-1; i!=(size_t)-1; i--) {
         lessthans.push_back(unsigned_compare.add_gate(lessthan_table, SENDER_BIT(i), RECVER_BIT(i)));
     }
     vector<size_t> xnors;
