@@ -11,37 +11,13 @@
 #include <sys/types.h>
 #include <vector>
 
+#include "Circuit.h"
+#include "ReceiverEvaluator.h"
+#include "SenderEvaluator.h"
 #include "utils.h"
 
 using namespace boost;
 using namespace std;
-
-typedef std::vector<uint8_t> bytevector;
-typedef std::vector<bool> bitvector;
-
-bitvector unpack_bv(bytevector x) {
-    bitvector y;
-    for(uint8_t a : x) {
-        for(int i = 0; i < 8; i++){
-            y.push_back( !!( (a & (1 << i)) >> i) );
-        }
-    }
-    return y;
-}
-
-bytevector pack_bv(bitvector x) {
-    bytevector y;
-    uint8_t tmp=0, i=0;
-    for(bool a : x) {
-        tmp |= (a << i);
-        if(++i == 8) {
-            y.push_back(tmp);
-            tmp = i = 0;
-        }
-    }
-    if(i != 0) { y.push_back(tmp); }
-    return y;
-}
 
 // placeholder naive implementation for testing
 class TerriblyInsecureObliviousTransfer {
@@ -61,144 +37,6 @@ class TerriblyInsecureObliviousTransfer {
         return bit ? y : x;
     }
 };
-
-
-/******************************************************************************/
-/* Wire and related structs ***************************************************/
-/******************************************************************************/
-
-// Derived from this haskell datastructure
-// data Gate = Input Bool Int | Function (Bool->Bool->Bool) Gate Gate | Output Gate deriving (Eq, Show)
-
-struct SenderTag {};
-struct ReceiverTag {};
-
-struct InputWire {
-    InputWire(size_t i, variant<SenderTag, ReceiverTag> who_) : index(i), who(who_) {}
-    size_t index;
-    variant<SenderTag, ReceiverTag> who;
-};
-struct GateWire {
-    GateWire(uint8_t truth_table_, size_t l_, size_t r_) : truth_table(truth_table_), l(l_), r(r_) {}
-    uint8_t truth_table; size_t l; size_t r;
-};
-struct OutputWire {
-    OutputWire(size_t index_) : index(index_) {}
-    size_t index;
-};
-typedef variant<InputWire, GateWire, OutputWire> Wire;
-
-
-/******************************************************************************/
-/* Circuit class **************************************************************/
-/******************************************************************************/
-class Circuit {
-public:
-    size_t num_bits;
-    vector<Wire> wires;
-
-    Circuit(size_t num_bits);
-    size_t add_gate(uint8_t truth_table, size_t l, size_t r) {
-        wires.push_back(GateWire(truth_table, l, r));
-        return wires.size() - 1;
-    }
-    void mark_as_output(size_t index) {
-        wires.push_back(OutputWire(index));
-    }
-};
-
-Circuit::Circuit(size_t num_bits){
-    this->num_bits = num_bits;
-    for(size_t i = 0; i < num_bits; i++) {
-        wires.push_back(InputWire(i, SenderTag()));
-    }
-    for(size_t i = 0; i < num_bits; i++) {
-        wires.push_back(InputWire(i, ReceiverTag()));
-    }
-}
-
-bool eval_truthtable(uint8_t table, bool x, bool y) {
-    /*
-    x y t
-    0 0 a LSB
-    0 1 b
-    1 0 c
-    1 1 d
-    */
-    uint8_t x_ = x ? BOOST_BINARY(1100) : BOOST_BINARY(0011);
-    uint8_t y_ = y ? BOOST_BINARY(1010) : BOOST_BINARY(0101);
-    return table & x_ & y_;
-}
-
-struct eval_wire : public static_visitor<> {
-    typedef bool result_type;
-    Circuit *c;
-    bitvector *result;
-    bitvector *x, *y;
-    bitvector *tempwires, *evalflags;
-    size_t i;
-    eval_wire(Circuit* c_, bitvector* res, bitvector* x_, bitvector* y_, bitvector* tw, bitvector* ef, size_t i_) :
-        c(c_), result(res), x(x_), y(y_), tempwires(tw), evalflags(ef), i(i_) {}
-    void mark_evaluated(size_t j, bool b) {
-        (*tempwires)[j] = b;
-        (*evalflags)[j] = 1;
-    }
-    bool recursive_eval(size_t j) {
-        size_t tmp = i;
-        i = j;
-        bool b = (*evalflags)[i] ? (*tempwires)[i] : apply_visitor((*this), c->wires[i]);
-        mark_evaluated(j, b);
-        i = tmp;
-        return b;
-    }
-    bool operator()(InputWire& w) {
-        struct matcher : static_visitor<> {
-            typedef bool result_type;
-            bitvector *x, *y;
-            InputWire &w;
-            matcher(bitvector *x_, bitvector *y_, InputWire& w_) : x(x_), y(y_), w(w_) {}
-            bool operator()(SenderTag&) {
-                return (*x)[w.index];
-            }
-            bool operator()(ReceiverTag&) {
-                return (*y)[w.index];
-            }
-        } m(x,y,w);
-        bool b = apply_visitor(m, w.who);
-        mark_evaluated(i, b);
-        return b;
-    };
-    bool operator()(GateWire& w) {
-        if((*evalflags)[i]) {
-            return (*tempwires)[i];
-        } else {
-            bool l = recursive_eval(w.l);
-            bool r = recursive_eval(w.r);
-            bool b = eval_truthtable(w.truth_table, l, r);
-            mark_evaluated(i, b);
-            return b;
-        }
-    }
-    bool operator()(OutputWire& w) {
-        bool b = recursive_eval(w.index);
-        result->push_back(b);
-        return b;
-    }
-};
-bytevector eval_circuit(Circuit c, bytevector x_, bytevector y_) {
-    bitvector result;
-    bitvector x, y;
-    bitvector tempwires(c.wires.size(), 0);
-    bitvector evalflags(c.wires.size(), 0);
-    x = unpack_bv(x_);
-    y = unpack_bv(y_);
-    size_t i;
-    for(i=0; i<c.wires.size(); i++) {
-        auto ew = eval_wire(&c, &result, &x, &y, &tempwires, &evalflags, i);
-        apply_visitor(ew, c.wires[i]);
-    }
-    return pack_bv(result);
-}
 
 /******************************************************************************/
 /* The fabled generate_unsigned_compare_circuit function **********************/
@@ -263,91 +101,6 @@ Circuit generate_unsigned_compare_circuit(size_t num_bits) {
 }
 
 /******************************************************************************/
-/* SenderEvaluator class ******************************************************/
-/******************************************************************************/
-class SenderEvaluator{
-private:
-    Circuit ungarbled_circuit;
-    Circuit garbled_circuit;
-    size_t num_bits;
-public:
-    SenderEvaluator(size_t num_bits);
-    void execute_protocol(int sd);
-    void send_garbled_tables(int sd);
-    void send_sender_inputs(int sd);
-    void send_outputs(int sd);
-    void serve_wires(int sd);
-};
-
-SenderEvaluator::SenderEvaluator(size_t num_bits) : ungarbled_circuit(num_bits), garbled_circuit(num_bits) {
-    this->num_bits = num_bits;
-}
-
-void SenderEvaluator::execute_protocol(int sd){
-    this->send_garbled_tables(sd);
-    this->send_sender_inputs(sd);
-    this->send_outputs(sd);
-    this->serve_wires(sd);
-}
-
-void SenderEvaluator::send_garbled_tables(int sd){
-    cout << "I'M SENDING GARBLED TABLES NOW " << sd << endl;
-}
-
-void SenderEvaluator::send_sender_inputs(int sd){
-    cout << "I'M SENDING MY INPUTS NOW " << sd << endl;
-}
-
-void SenderEvaluator::send_outputs(int sd){
-    cout << "I'M SENDING OUTPUTS NOW " << sd << endl;
-}
-
-void SenderEvaluator::serve_wires(int sd){
-    cout << "I'M SERVING WIRES NOW " << sd << endl;
-}
-
-/******************************************************************************/
-/* ReceiverEvaluator class ****************************************************/
-/******************************************************************************/
-class ReceiverEvaluator{
-private:
-    Circuit garbled_circuit;
-public:
-    ReceiverEvaluator(size_t num_bits);
-    void execute_protocol(int sd);
-    void receive_garbled_tables(int sd);
-    void receive_sender_inputs(int sd);
-    void receive_outputs(int sd);
-    void request_wires(int sd, int index, int bit);
-};
-
-ReceiverEvaluator::ReceiverEvaluator(size_t num_bits) : garbled_circuit(num_bits) {
-}
-
-void ReceiverEvaluator::execute_protocol(int sd){
-    this->receive_garbled_tables(sd);
-    this->receive_sender_inputs(sd);
-    this->receive_outputs(sd);
-    this->request_wires(sd, 0, 0);
-}
-
-void ReceiverEvaluator::receive_garbled_tables(int sd){
-    cout << "I'M RECEIVING GARBLED TABLES NOW " << sd << endl;
-}
-
-void ReceiverEvaluator::receive_sender_inputs(int sd){
-    cout << "I'M RECEIVING INPUTS NOW " << sd << endl;
-}
-
-void ReceiverEvaluator::receive_outputs(int sd){
-    cout << "I'M RECEIVING OUTPUTS NOW " << sd << endl;
-}
-
-void ReceiverEvaluator::request_wires(int sd, int index, int bit){
-    cout << "I'M REQUESTING WIRES NOW " << sd << " " << index << " " << bit << endl;
-}
-
-/******************************************************************************/
 /* Mains **********************************************************************/
 /******************************************************************************/
 
@@ -391,7 +144,7 @@ int sender_main(int, char** argv) {
 
     freeaddrinfo(result);
 
-    SenderEvaluator eval = SenderEvaluator(sizeof(wealth) * 8);
+    SenderEvaluator eval = SenderEvaluator( sizeof(wealth) * 8 );
     eval.execute_protocol(sd);
     return 0;
 }
@@ -514,6 +267,9 @@ int main(int argc, char** argv) {
     auto print_evaluator_usage = [&]() {
         cout << "Usage is " << argv[0] << " evaluator <wealth1> <wealth2>" << endl;
     };
+    auto print_test_usage = [&]() {
+        cout << "Usage is " << argv[0] << " test" << endl;
+    };
 
     auto print_usage = [&]() {
         print_sender_usage();
@@ -521,6 +277,8 @@ int main(int argc, char** argv) {
         print_receiver_usage();
         cout << "OR" << endl;
         print_evaluator_usage();
+        cout << "OR" << endl;
+        print_test_usage();
     };
 
     if(argc < 2) {

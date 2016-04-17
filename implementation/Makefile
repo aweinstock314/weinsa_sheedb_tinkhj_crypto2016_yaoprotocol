@@ -6,9 +6,9 @@ CCFLAGS=-O2 ${MITIGATIONS} -std=c++1y -Wall -Wextra -pedantic -Werror
 
 all: bin/yaoprotocol
 
-bin/yaoprotocol: src/yaoprotocol.cpp src/utils.h src/utils.cpp
+bin/yaoprotocol: src/yaoprotocol.cpp src/utils.cpp src/Circuit.cpp src/ReceiverEvaluator.cpp src/SenderEvaluator.cpp #src/utils.h src/Circuit.h src/ReceiverEvaluator.h src/SenderEvaluator.h
 	mkdir -p bin
-	g++ ${CCFLAGS} $< -o $@ -lcryptopp
+	g++ ${CCFLAGS} $^ -o $@ -lcryptopp
 
 clean:
 	rm -r ./bin

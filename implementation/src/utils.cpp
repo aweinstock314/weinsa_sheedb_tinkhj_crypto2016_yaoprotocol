@@ -1,7 +1,6 @@
 #include <unistd.h>
 #include "utils.h"
 
-// "all or nothing" read/write, to handle interruptions/byte-by-byte input
 #define DEF_AON(prefix, underlying) \
 size_t underlying ## _aon(int fd, prefix char* buf, size_t count) { \
     ssize_t tmp; \
@@ -19,4 +18,26 @@ DEF_AON(const, write)
 
 #undef DEF_AON
 
+bitvector unpack_bv(bytevector x) {
+    bitvector y;
+    for(uint8_t a : x) {
+        for(int i = 0; i < 8; i++){
+            y.push_back( !!( (a & (1 << i)) >> i) );
+        }
+    }
+    return y;
+}
 
+bytevector pack_bv(bitvector x) {
+    bytevector y;
+    uint8_t tmp=0, i=0;
+    for(bool a : x) {
+        tmp |= (a << i);
+        if(++i == 8) {
+            y.push_back(tmp);
+            tmp = i = 0;
+        }
+    }
+    if(i != 0) { y.push_back(tmp); }
+    return y;
+}
