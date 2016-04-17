@@ -5,7 +5,7 @@ import Data.Function
 import Data.Word
 import Test.QuickCheck
 
-packBits :: FiniteBits b => [Bool] -> b
+{- packBits :: FiniteBits b => [Bool] -> b
 packBits xs = foldr (.|.) zeroBits (zipWith shiftL (map f xs) [0..]) where
     f True = bit 0
     f False = zeroBits
@@ -18,7 +18,7 @@ checkUnpackPackId = do
     quickCheck (\x -> i x == id (x :: Word64))
 
 mapBits :: FiniteBits b => (Bool -> Bool -> Bool) -> b -> b -> b
-mapBits f x y = packBits (zipWith f (unpackBits x) (unpackBits y))
+mapBits f x y = packBits (zipWith f (unpackBits x) (unpackBits y)) -}
 
 truthTableToFunction :: (Bool, Bool, Bool, Bool) -> (Bool -> Bool -> Bool)
 truthTableToFunction (a,b,c,d) = f where
@@ -36,14 +36,14 @@ functionToTruthTable f = (a,b,c,d) where
 allGates = map truthTableToFunction (range ((False,False,False,False),(True,True,True,True)))
 allGatePairs = [(f,g) | f <- allGates, g <- allGates]
 
-mapReduce f g b x y = foldr g b (zipWith f (unpackBits x) (unpackBits y))
+{- mapReduce f g b x y = foldr g b (zipWith f (unpackBits x) (unpackBits y))
 bruteFunction = [(f,g,b) | (f,g) <- allGatePairs, b <- [False,True]]
 
 bruteMapReduce = do
     let tablify (f,g,b) = (functionToTruthTable f, functionToTruthTable g, b)
     let bruteNumber = [(x,y) | x <- d, y <- d] where d = [minBound::Word8 .. maxBound]
     mapM (print . tablify) (filter (\(f,g,b) -> all (\(x,y) -> (x < y) == mapReduce f g b x y) bruteNumber) bruteFunction)
-
+-}
 instance Show (Bool -> Bool -> Bool) where
     show = aux . functionToTruthTable where
         aux (False, True, False, False) = "(<)"

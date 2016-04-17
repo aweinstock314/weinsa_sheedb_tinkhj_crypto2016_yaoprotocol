@@ -1,0 +1,55 @@
+
+
+
+
+
+
+
+
+for masking step
+
+
+S                            R
+	  <====
+               ( v = ( (x_b + (k^e) ) mod N) ) 
+
+
+convert x_b (randomly chosen message b) to Integer
+
+encrypt random value, k, and take the sum of k^e and x_b (both in Integer form), mod N , and let this be v.
+
+send v.
+
+
+(Send byte by byte) (with each step)
+
+(Step 5)
+
+
+enmsk = encrypt masking value
+
+each byte of the randomly chosen message & enmsk are upcasted to Class Integer, and then summed.
+
+The sum is then sent.
+
+
+(repeat for all bytes in rnd msg) 
+
+(use c++ vector class to store) (will probably need to send decoded value, encode, and then push back)
+
+
+(Step 7) (+ Step 8 ?)
+
+Will need vectors of cryptopp Integer objects for each byte of both messages , for proper arithmetic
+
+
+Send the corresponding sums, decode the cryptopp::Integerupcast of each byte and send
+
+
+On receiving side, receive decoded cryptopp::Integer upcasts of each byte, (for both messages), then deccrypt messages using arithmetic with cryptopp::Integer upcasts of each byte of k (not encryption of k), wwith cryptopp::Integer upcasts of both messages.
+
+Downcast each byte into two buffers, and the resulting msgs have been computed.
+
+
+
+
