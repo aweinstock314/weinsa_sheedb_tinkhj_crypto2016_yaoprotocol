@@ -1,7 +1,6 @@
 #include <crypto++/filters.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include "Circuit.h"
 #include "GarbledCircuit.h"
 
 void encrypt(uint8_t *dst, const uint8_t *src, const uint8_t *k1, const uint8_t *k2) {
@@ -24,12 +23,11 @@ void decrypt(uint8_t *dst, const uint8_t *src, const uint8_t *k1, const uint8_t 
 //  "Efficient Three-Party Computation from Cut-and-Choose" by Choi, Katz, Malozemoff, and Zikas
 // This is more efficient than the garbling scheme from "A Proof of Security of Yao's Protocol for Two-Party Computation" by Lindell and Pinkas
 //  since the receiver only needs to make 1 decryption per gate (down from 4), as well as space/communication savings from lack of padding/output maps
-GarbledCircuit::GarbledCircuit(Circuit c_) :
-    c(c_), zeros(c.wires.size()), ones(c.wires.size()), gates(c.wires.size()), lambdas(c.wires.size()) {
+SenderGarbledCircuit::SenderGarbledCircuit(Circuit c_) :
+    c(c_), zeros(c.wires.size()), ones(c.wires.size()), lambdas(c.wires.size()) {
     int fd = open("/dev/urandom", O_RDONLY);
     uint8_t temp;
-    size_t i,j,k;
-    GateWire *w;
+    size_t i;
 
     for (i=0; i<c.wires.size(); i++) {
         // produce random bytevectors for the keys
@@ -53,37 +51,41 @@ GarbledCircuit::GarbledCircuit(Circuit c_) :
         }
 
         // assumes a topological ordering, which is produced by generate_unsigned_compare_circuit
-        //  it would be more elegant to walk the circuit starting from the outputs, but this is easier (because boost)
-        if((w = boost::get<GateWire>(&c.wires[i]))) {
-            for(j = 0; j <= 1; j++) { for(k = 0; k <= 1; k++) {
-                // adapted from Figure 1 of Zikas et. al.
-                // P[g, j, k] <- Enc_{K_a^j, K_b^k}(K_g^\sigma concat \sigma)
-                // \sigma = G_g(\lambda_a xor j, \lambda_b xor k) xor \lambda_g
-                uint8_t *buf = &gates[i].values[j][k][0];
-                bool sigma = eval_truthtable(w->truth_table, lambdas[w->l] ^ j, lambdas[w->r] ^ k) ^ lambdas[i];
-#define KEY(wire, bit) ((bit) ? ones[(wire)] : zeros[(wire)]).data()
-                memcpy(buf, KEY(i, sigma), SEC_PARAM);
-                buf[SEC_PARAM] = sigma;
-                encrypt(buf, buf, KEY(w->l, j), KEY(w->r, k));
+        //  it would be more elegant to walk the circuit starting from the outputs, but this is easier
+        struct matcher : public boost::static_visitor<> {
+            SenderGarbledCircuit *p;
+            size_t i;
+            matcher(SenderGarbledCircuit *parent, size_t i_) : p(parent), i(i_) {}
+            void operator()(InputWire& w) const {
+                p->gates.push_back(w);
+            }
+            void operator()(OutputWire& w) const {
+                p->gates.push_back(w);
+            }
+            void operator()(GateWire& w) const {
+                size_t j, k;
+                for(j = 0; j <= 1; j++) { for(k = 0; k <= 1; k++) {
+                    // adapted from Figure 1 of Zikas et. al.
+                    // P[g, j, k] <- Enc_{K_a^j, K_b^k}(K_g^\sigma concat \sigma)
+                    // \sigma = G_g(\lambda_a xor j, \lambda_b xor k) xor \lambda_g
+                    GarbledWire gw;
+                    p->gates.push_back(gw);
+                    uint8_t *buf = &gw.values[j][k][0];
+                    gw.l = w.l; gw.r = w.r;
+                    bool sigma = eval_truthtable(w.truth_table, p->lambdas[w.l] ^ j, p->lambdas[w.r] ^ k) ^ p->lambdas[i];
+#define KEY(wire, bit) ((bit) ? p->ones[(wire)] : p->zeros[(wire)]).data()
+                    memcpy(buf, KEY(i, sigma), SEC_PARAM);
+                    buf[SEC_PARAM] = sigma;
+                    encrypt(buf, buf, KEY(w.l, j), KEY(w.r, k));
 #undef KEY
-            }}
-        }
+                }}
+            }
+        };
+        boost::apply_visitor(matcher(this, i), c.wires[i]);
     }
-
-    // walk circuit, gen encrypted truth tables
-    // use eval_truthtable to get output value
-    // add bit vec for lambdas
-
-// TODO: init 0s and 1s inside contructor
-// create garbled tables
 }
 
-template<class OT> void recv(int fd, bytevector y_) {
-    bitvector y = unpack_bv(y_);
-    // TODO: recive and eval circuit
-}
-
-template<class OT> void GarbledCircuit::send(int fd, bytevector x_) {
+template<class OT> void SenderGarbledCircuit::send(int fd, bytevector x_) {
     bitvector x = unpack_bv(x_);
     size_t i;
     for(i=0; i<x.size(); i++) {
@@ -95,5 +97,7 @@ template<class OT> void GarbledCircuit::send(int fd, bytevector x_) {
     }
 }
 
-//send<RSA OT>( // todo: args);
-//send<DUAL_EC_DRBG_OT>(// todo: args);
+template<class OT> void recv(int fd, bytevector y_) {
+    bitvector y = unpack_bv(y_);
+    // TODO: recive and eval circuit
+}
