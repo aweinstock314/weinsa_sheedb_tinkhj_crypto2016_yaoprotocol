@@ -37,12 +37,11 @@ struct SenderGarbledCircuit {
 
 struct ReceiverGarbledCircuit {
     vector<bytevector> keys;
+    vector<bool> evaluated;
     vector<GarbledGate> gates;
     bitvector lambdas;
 
-    ReceiverGarbledCircuit(Circuit c_);
-
-    template<class OT> void recv(int fd, bytevector y_);
+    template<class OT> ReceiverGarbledCircuit(int fd, bytevector y_);
 };
 
 #endif

@@ -85,6 +85,57 @@ SenderGarbledCircuit::SenderGarbledCircuit(Circuit c_) :
     }
 }
 
+void serialize_gc(int fd, const vector<GarbledGate>& gc) {
+    struct serializer : public boost::static_visitor<> {
+        int fd;
+        serializer(int fd_) : fd(fd_) {}
+        void operator()(const InputWire& w) {
+            write_aon(fd, "0", sizeof(char));
+            write_aon(fd, tag_to_bool(w.who) ? "S" : "R", sizeof(char));
+            write_aon(fd, (char*)w.index, sizeof(w.index));
+        }
+        // TODO: serialization of {GarbledWire, OutputWire}
+        void operator()(const GarbledWire& w) {
+            (void)w;
+        }
+        void operator()(const OutputWire& w) {
+            (void)w;
+        }
+    };
+    size_t i, n = gc.size();
+    serializer ser(fd);
+    write_aon(fd, (char*)n, sizeof(size_t));
+    for(i=0; i<n; i++) {
+        boost::apply_visitor(ser, gc[i]);
+    }
+}
+
+GarbledGate deserialize_gate(int fd) {
+    char flag;
+    read_aon(fd, &flag, sizeof(char));
+    switch(flag) {
+        case '0': {
+            char who;
+            read_aon(fd, &who, sizeof(char));
+            size_t index;
+            read_aon(fd, (char*)&index, sizeof(size_t));
+            return InputWire(index, bool_to_tag(who == 'S' ? true : false));
+        }
+        // TODO: deserialization of {GarbledWire, OutputWire}
+        default: {
+            printf("deserialize_gate: wonky flag value %d\n", flag);
+            exit(1);
+        }
+    }
+}
+
+vector<GarbledGate> deserialize_gc(int fd) {
+    vector<GarbledGate> gc;
+    size_t n;
+    read_aon(fd, (char*)&n, sizeof(size_t));
+    return gc;
+}
+
 template<class OT> void SenderGarbledCircuit::send(int fd, bytevector x_) {
     bitvector x = unpack_bv(x_);
     size_t i;
@@ -97,7 +148,20 @@ template<class OT> void SenderGarbledCircuit::send(int fd, bytevector x_) {
     }
 }
 
-template<class OT> void recv(int fd, bytevector y_) {
+template<class OT> ReceiverGarbledCircuit::ReceiverGarbledCircuit(int fd, bytevector y_) {
     bitvector y = unpack_bv(y_);
-    // TODO: recive and eval circuit
+    size_t num_bits = y.size();
+
+    keys.resize(num_bits);
+    evaluated.resize(num_bits, false);
+    lambdas.resize(num_bits);
+
+    size_t i;
+    for(i=0; i<num_bits; i++) {
+        keys[i].resize(SEC_PARAM);
+        write_aon(fd, keys[i].data(), SEC_PARAM);
+    }
+    for(i=0; i<num_bits; i++) {
+        keys[i+num_bits] = OT::recv(fd, y[i]);
+    }
 }

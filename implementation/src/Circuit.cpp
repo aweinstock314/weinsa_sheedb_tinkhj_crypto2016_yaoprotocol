@@ -20,6 +20,24 @@ void Circuit::mark_as_output(size_t index) {
     wires.push_back(OutputWire(index));
 }
 
+variant<SenderTag, ReceiverTag> bool_to_tag(bool b) {
+    SenderTag s;
+    ReceiverTag r;
+    variant<SenderTag, ReceiverTag> v = r;
+    if(b) { v = s; }
+    return v;
+}
+
+bool tag_to_bool(variant<SenderTag, ReceiverTag> b) {
+    struct matcher : public boost::static_visitor<> {
+        typedef bool result_type;
+        bool operator()(SenderTag&) { return true; }
+        bool operator()(ReceiverTag&) { return false; }
+    } m;
+    return boost::apply_visitor(m, b);
+}
+
+
 bool eval_truthtable(uint8_t table, bool x, bool y) {
     /*
     x y t

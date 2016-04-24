@@ -33,6 +33,9 @@ typedef variant<InputWire, GateWire, OutputWire> Wire;
 
 struct eval_wire;
 
+variant<SenderTag, ReceiverTag> bool_to_tag(bool b);
+bool tag_to_bool(variant<SenderTag, ReceiverTag> b);
+
 /******************************************************************************/
 /* Circuit class **************************************************************/
 /******************************************************************************/
