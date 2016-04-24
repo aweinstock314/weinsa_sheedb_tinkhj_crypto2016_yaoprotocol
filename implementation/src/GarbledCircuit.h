@@ -14,6 +14,8 @@
 #define GARBLER_CIPHER CryptoPP::CTR_Mode<CryptoPP::AES>
 //#define GARBLER_CIPHER CryptoPP::Salsa20
 
+void encrypt(uint8_t *dst, const uint8_t *src, const uint8_t *k1, const uint8_t *k2);
+void decrypt(uint8_t *dst, const uint8_t *src, const uint8_t *k1, const uint8_t *k2);
 
 struct GarbledWire {
     uint8_t values[2][2][SEC_PARAM+1];
@@ -37,14 +39,15 @@ struct SenderGarbledCircuit {
 
 struct ReceiverGarbledCircuit {
     vector<bytevector> keys;
-    vector<bool> evaluated;
     bitvector result;
     vector<GarbledGate> gates;
     size_t num_bits;
     bitvector lambdas;
+    bitvector evaluated;
+    bitvector sigmas;
 
     template<class OT> ReceiverGarbledCircuit(int fd, bytevector y_);
-    bitvector eval(bitvector y);
+    bitvector eval(const bitvector& y);
 };
 
 void serialize_gc(int fd, const vector<GarbledGate>& gc);

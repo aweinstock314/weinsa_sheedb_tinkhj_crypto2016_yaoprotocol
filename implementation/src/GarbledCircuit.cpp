@@ -160,11 +160,15 @@ template<class OT> bytevector SenderGarbledCircuit::send(int fd, bytevector x_) 
     write_aon(fd, (char*)&c.num_bits, sizeof(size_t));
     serialize_gc(fd, gates);
     for(i=0; i<c.num_bits; i++) {
+        bool sigma = x[i] ^ lambdas[i];
+        write_aon(fd, (char*)&sigma, sizeof(bool));
+    }
+    for(i=0; i<c.num_bits; i++) {
         bool tmp = lambdas[i+c.num_bits];
         write_aon(fd, (char*)&tmp, sizeof(bool));
     }
     for(i=0; i<c.num_bits; i++) {
-        write_aon(fd, (x[i] ? ones[i] : zeros[i]).data(), SEC_PARAM);
+        write_aon(fd, (x[i] ^ lambdas[i] ? ones[i] : zeros[i]).data(), SEC_PARAM);
     }
     for(i=0; i<c.num_bits; i++) {
         OT::send(fd, zeros[i], ones[i]); // todo: architechture for parallelism
@@ -188,13 +192,20 @@ template<class OT> ReceiverGarbledCircuit::ReceiverGarbledCircuit(int fd, byteve
     gates = deserialize_gc(fd);
 
     evaluated.resize(gates.size(), 0);
-    keys.resize(2*num_bits);
+    sigmas.resize(gates.size(), 0);
+    keys.resize(gates.size(), vector<uint8_t>(SEC_PARAM, 0));
     lambdas.resize(num_bits);
 
+    for(i=0; i<num_bits; i++) {
+        bool sigma;
+        read_aon(fd, (char*)&sigma, sizeof(bool));
+        sigmas[i] = sigma;
+    }
     for(i=0; i<num_bits; i++) {
         bool tmp;
         read_aon(fd, (char*)&tmp, sizeof(bool));
         lambdas[i] = tmp;
+        sigmas[num_bits+i] = y[i] ^ lambdas[i];
     }
     for(i=0; i<num_bits; i++) {
         keys[i].resize(SEC_PARAM);
@@ -216,8 +227,38 @@ template<class OT> ReceiverGarbledCircuit::ReceiverGarbledCircuit(int fd, byteve
     write_aon(fd, (char*)result_.data(), tmp);
 }
 
-bitvector ReceiverGarbledCircuit::eval(bitvector y) {
-    bitvector tmp;
-    (void)y; // TODO: walk the garbled circuit
-    return tmp;
+bitvector ReceiverGarbledCircuit::eval(const bitvector& y) {
+    struct eval_garbled_wire : public static_visitor<> {
+        ReceiverGarbledCircuit *p;
+        const bitvector *y;
+        bitvector *output;
+        size_t i;
+        eval_garbled_wire(ReceiverGarbledCircuit *parent, const bitvector *y_, bitvector *output_, size_t i_) : p(parent), y(y_), output(output_), i(i_) {}
+        // TODO: support non-topological ordering (currently the asserts will fail if given a non-topological circuit)
+        void operator()(const InputWire&) {
+            assert(p->evaluated[i]);
+        }
+        void operator()(const GarbledWire& w) {
+            assert(p->evaluated[w.l]);
+            assert(p->evaluated[w.r]);
+            p->evaluated[i] = true;
+            uint8_t buf[SEC_PARAM+1];
+            decrypt(buf, w.values[p->sigmas[w.l]][p->sigmas[w.r]], p->keys[w.l].data(), p->keys[w.r].data());
+            p->sigmas[i] = buf[SEC_PARAM];
+            memcpy(p->keys[i].data(), buf, SEC_PARAM);
+        }
+        void operator()(const OutputWire& w) {
+            assert(p->evaluated[w.index]);
+            output->push_back(p->sigmas[w.index]);
+        }
+    };
+    size_t i;
+    bitvector output;
+
+    for(i=0; i<gates.size(); i++) {
+        eval_garbled_wire egw(this, &y, &output, i);
+        boost::apply_visitor(egw, gates[i]);
+    }
+
+    return output;
 }
