@@ -1,7 +1,7 @@
 //Oblivious transfer based off the RSA implementation on Wikipedia
 
 #include <iostream>
-//#include <crypto++.h>
+//#include <cryptopp.h>
 //#include <cryptopp.h>
 //#include <cryptlib.h>
 //#include <crptopp/rsa.h>

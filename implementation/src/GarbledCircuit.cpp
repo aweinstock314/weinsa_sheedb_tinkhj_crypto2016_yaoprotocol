@@ -1,4 +1,4 @@
-#include <crypto++/filters.h>
+#include <cryptopp/filters.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "GarbledCircuit.h"
@@ -94,12 +94,15 @@ void serialize_gc(int fd, const vector<GarbledGate>& gc) {
             write_aon(fd, tag_to_bool(w.who) ? "S" : "R", sizeof(char));
             write_aon(fd, (char*)w.index, sizeof(w.index));
         }
-        // TODO: serialization of {GarbledWire, OutputWire}
         void operator()(const GarbledWire& w) {
-            (void)w;
+            write_aon(fd, "1", sizeof(char));
+            write_aon(fd, (char*)&w.values[0][0][0], 2 * 2 * (SEC_PARAM+1)*sizeof(uint8_t));
+            write_aon(fd, (char*)&w.l, sizeof(size_t));
+            write_aon(fd, (char*)&w.r, sizeof(size_t));
         }
         void operator()(const OutputWire& w) {
-            (void)w;
+            write_aon(fd, "2", sizeof(char));
+            write_aon(fd, (char*)w.index, sizeof(w.index));
         }
     };
     size_t i, n = gc.size();
@@ -121,7 +124,18 @@ GarbledGate deserialize_gate(int fd) {
             read_aon(fd, (char*)&index, sizeof(size_t));
             return InputWire(index, bool_to_tag(who == 'S' ? true : false));
         }
-        // TODO: deserialization of {GarbledWire, OutputWire}
+        case '1': {
+            GarbledWire w;
+            read_aon(fd, (char*)&w.values[0][0][0], 2 * 2 * (SEC_PARAM+1)*sizeof(uint8_t));
+            read_aon(fd, (char*)&w.l, sizeof(size_t));
+            read_aon(fd, (char*)&w.r, sizeof(size_t));
+            return w;
+        }
+        case '2': {
+            size_t index;
+            read_aon(fd, (char*)&index, sizeof(size_t));
+            return OutputWire(index);
+        }
         default: {
             printf("deserialize_gate: wonky flag value %d\n", flag);
             exit(1);

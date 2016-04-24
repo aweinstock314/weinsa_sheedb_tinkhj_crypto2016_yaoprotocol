@@ -1,9 +1,9 @@
 #ifndef GARBLED_CIRCUIT_H
 #define GARBLED_CIRCUIT_H
 
-#include <crypto++/aes.h>
-#include <crypto++/modes.h>
-#include <crypto++/salsa.h>
+#include <cryptopp/aes.h>
+#include <cryptopp/modes.h>
+#include <cryptopp/salsa.h>
 #include "Circuit.h"
 #include "utils.h"
 
