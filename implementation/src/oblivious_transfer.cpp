@@ -105,19 +105,26 @@ void ot_send(int sockfd,  bytevector msg1, bytevector msg2 ){
 
     //Send messages
     buf_size = m0_prime.ByteCount();
+    unsigned int actual_size = msg1.size();
     buffer = new byte[buf_size];
     m0_prime.Encode(buffer, buf_size);
     rc = write_aon(sockfd, (char*)&buf_size, sizeof(buf_size));
     CHECK_RW(rc, sizeof(buf_size), "Failed to write all bytes of m0' size")
+    //Need to send original bytevector size in order to prevent cases of leading 0 truncation
+    rc = write_aon(sockfd, (char*)&actual_size, sizeof(actual_size));
+    CHECK_RW(rc, sizeof(actual_size), "Failed to write all bytes of actual m0 size")
     rc = write_aon(sockfd, (char*)buffer, buf_size);
     CHECK_RW(rc, buf_size, "Failed to write all bytes of m0'")
     delete[] buffer;
 
     buf_size = m1_prime.ByteCount();
+    actual_size = msg2.size();
     buffer = new byte[buf_size];
     m1_prime.Encode(buffer, buf_size);
     rc = write_aon(sockfd, (char*)&buf_size, sizeof(buf_size));
     CHECK_RW(rc, sizeof(buf_size), "Failed to write all bytes of m1' size")
+    rc = write_aon(sockfd, (char*)&actual_size, sizeof(actual_size));
+    CHECK_RW(rc, sizeof(actual_size), "Failed to write all bytes of actual m1 size")
     rc = write_aon(sockfd, (char*)buffer, buf_size);
     CHECK_RW(rc, buf_size, "Failed to write all bytes of m1'")
     delete[] buffer;
