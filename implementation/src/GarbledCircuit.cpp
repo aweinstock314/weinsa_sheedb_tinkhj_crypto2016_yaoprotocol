@@ -145,37 +145,79 @@ GarbledGate deserialize_gate(int fd) {
 
 vector<GarbledGate> deserialize_gc(int fd) {
     vector<GarbledGate> gc;
-    size_t n;
+    size_t i, n;
     read_aon(fd, (char*)&n, sizeof(size_t));
+    for(i=0; i<n; i++) {
+        gc.push_back(deserialize_gate(fd));
+    }
     return gc;
 }
 
-template<class OT> void SenderGarbledCircuit::send(int fd, bytevector x_) {
+template<class OT> bytevector SenderGarbledCircuit::send(int fd, bytevector x_) {
     bitvector x = unpack_bv(x_);
+    assert(x.size() == c.num_bits);
     size_t i;
-    for(i=0; i<x.size(); i++) {
+    write_aon(fd, (char*)&c.num_bits, sizeof(size_t));
+    serialize_gc(fd, gates);
+    for(i=0; i<c.num_bits; i++) {
+        bool tmp = lambdas[i+c.num_bits];
+        write_aon(fd, (char*)&tmp, sizeof(bool));
+    }
+    for(i=0; i<c.num_bits; i++) {
         write_aon(fd, (x[i] ? ones[i] : zeros[i]).data(), SEC_PARAM);
     }
-    // x.size() == y.size() invariant should be enforced elsewhere
-    for(i=0; i<x.size(); i++) {
+    for(i=0; i<c.num_bits; i++) {
         OT::send(fd, zeros[i], ones[i]); // todo: architechture for parallelism
     }
+
+    bytevector result;
+    size_t output_size;
+    read(fd, (char*)&output_size, sizeof(size_t));
+    read(fd, (char*)result.data(), output_size);
 }
 
 template<class OT> ReceiverGarbledCircuit::ReceiverGarbledCircuit(int fd, bytevector y_) {
+    size_t i;
     bitvector y = unpack_bv(y_);
-    size_t num_bits = y.size();
+    read_aon(fd, (char*)&num_bits, sizeof(size_t));
+    assert(y.size() <= num_bits);
+    if(y.size() < num_bits) {
+        y.resize(num_bits);
+    }
 
-    keys.resize(num_bits);
-    evaluated.resize(num_bits, false);
+    gates = deserialize_gc(fd);
+
+    evaluated.resize(gates.size(), 0);
+    keys.resize(2*num_bits);
     lambdas.resize(num_bits);
 
-    size_t i;
+    for(i=0; i<num_bits; i++) {
+        bool tmp;
+        read_aon(fd, (char*)&tmp, sizeof(bool));
+        lambdas[i] = tmp;
+    }
     for(i=0; i<num_bits; i++) {
         keys[i].resize(SEC_PARAM);
         write_aon(fd, keys[i].data(), SEC_PARAM);
+        evaluated[i] = true;
     }
     for(i=0; i<num_bits; i++) {
-        keys[i+num_bits] = OT::recv(fd, y[i]);
+        keys[i+num_bits] = OT::recv(fd, y[i] ^ lambdas[i]);
+        evaluated[i+num_bits] = true;
     }
+
+    evaluated.resize(num_bits, false);
+
+    result = eval(y);
+
+    bytevector result_ = pack_bv(result);
+    size_t tmp = result_.size();
+    write_aon(fd, (char*)&tmp, sizeof(size_t));
+    write_aon(fd, (char*)result_.data(), tmp);
+}
+
+bitvector ReceiverGarbledCircuit::eval(bitvector y) {
+    bitvector tmp;
+    (void)y; // TODO: walk the garbled circuit
+    return tmp;
 }

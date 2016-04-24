@@ -32,16 +32,23 @@ struct SenderGarbledCircuit {
 
     SenderGarbledCircuit(Circuit c_);
 
-    template<class OT> void send(int fd, bytevector x_);
+    template<class OT> bytevector send(int fd, bytevector x_);
 };
 
 struct ReceiverGarbledCircuit {
     vector<bytevector> keys;
     vector<bool> evaluated;
+    bitvector result;
     vector<GarbledGate> gates;
+    size_t num_bits;
     bitvector lambdas;
 
     template<class OT> ReceiverGarbledCircuit(int fd, bytevector y_);
+    bitvector eval(bitvector y);
 };
+
+void serialize_gc(int fd, const vector<GarbledGate>& gc);
+GarbledGate deserialize_gate(int fd);
+vector<GarbledGate> deserialize_gc(int fd);
 
 #endif
