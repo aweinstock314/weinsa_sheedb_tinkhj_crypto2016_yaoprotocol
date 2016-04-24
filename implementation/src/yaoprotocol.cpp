@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "Circuit.h"
-#include "oblivious_transfer.h"
+#include "GarbledCircuit.h"
 #include "ReceiverEvaluator.h"
 #include "SenderEvaluator.h"
 #include "utils.h"
@@ -52,8 +52,8 @@ mkManualLessThan size = output where
     intermediate2 = zipWith3 (\x y z -> (Function (&&) x (Function (&&) y z))) lessthans xnors intermediate1
     output = foldr (Function (||)) (Constant False) intermediate2
 */
-//This circuit evaluates a < b, where a is the left input of the circuit and b is the right input
 
+//This circuit evaluates a < b, where a is the left input of the circuit and b is the right input
 Circuit generate_unsigned_compare_circuit(size_t num_bits) {
     Circuit unsigned_compare { num_bits };
     uint8_t and_table      = BOOST_BINARY(1000);
