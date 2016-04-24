@@ -1,8 +1,9 @@
 #ifndef UTILS_H
 #define UTILS_H
 #include <boost/utility/binary.hpp>
-#include <vector>
+#include <boost/variant.hpp>
 #include <stdint.h>
+#include <vector>
 
 typedef std::vector<uint8_t> bytevector;
 typedef std::vector<bool> bitvector;

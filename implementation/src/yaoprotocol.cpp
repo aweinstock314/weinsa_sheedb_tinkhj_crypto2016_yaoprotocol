@@ -1,6 +1,4 @@
 #include <bitset>
-#include <boost/utility/binary.hpp>
-#include <boost/variant.hpp>
 #include <iostream>
 #include <netdb.h>
 #include <stdint.h>
