@@ -11,6 +11,7 @@
 
 #include "Circuit.h"
 #include "GarbledCircuit.h"
+#include "oblivious_transfer.h"
 #include "ReceiverEvaluator.h"
 #include "SenderEvaluator.h"
 #include "utils.h"

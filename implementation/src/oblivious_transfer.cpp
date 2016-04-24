@@ -211,6 +211,7 @@ bytevector ot_recv(int sockfd, uint8_t bit){
     bv_size = bv_int.ByteCount();    //get size (in bytes)
     //allocate heap block for buffer
     bv_buffer = (byte *) calloc_wrapper(bv_size,sizeof(byte));
+    bv_int.Encode(bv_buffer, bv_size);
     //send size of blinded value
     send(sockfd,(void *)&bv_size,sizeof(unsigned int),0);
     //send contents of blinded value
@@ -224,6 +225,8 @@ bytevector ot_recv(int sockfd, uint8_t bit){
     //receive size of c_0
     recv(sockfd,(void *)&c0_size,sizeof(unsigned int),0);
     c0_buffer = (byte *)calloc_wrapper(c0_size,sizeof(byte));
+    unsigned int c_0_actual_size;
+    recv(sockfd, (void*)&c_0_actual_size, sizeof(c_0_actual_size), 0);
     //receive contents of c_0
     recv(sockfd,(void *)c0_buffer,c0_size,0);
     c0_int.Decode(c0_buffer,c0_size,Integer::UNSIGNED);
@@ -232,16 +235,18 @@ bytevector ot_recv(int sockfd, uint8_t bit){
     //receive size of c_1
     recv(sockfd,(void *)&c1_size,sizeof(unsigned int),0);
     c1_buffer = (byte *)calloc_wrapper(c1_size,sizeof(byte));
+    unsigned int c_1_actual_size;
+    recv(sockfd, (void*)&c_1_actual_size, sizeof(c_1_actual_size), 0);
     //receive contents of c_1
     recv(sockfd,(void *)c1_buffer,c1_size,0);
-    c1_int.Decode(c0_buffer,c1_size,Integer::UNSIGNED);
+    c1_int.Decode(c1_buffer,c1_size,Integer::UNSIGNED);
 
     //step 8    
     //get message
 
     //choose message
     mb_int = (bit)?(c1_int - random_value):(c0_int - random_value);
-    mb_size = mb_int.ByteCount();
+    mb_size = (bit)?(c_1_actual_size):(c_0_actual_size);
     mb_buffer = (byte *)calloc(mb_size,sizeof(byte));
     //change to string
     mb_int.Encode(mb_buffer,mb_size,Integer::UNSIGNED);
