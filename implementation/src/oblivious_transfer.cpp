@@ -253,6 +253,25 @@ bytevector ot_recv(int sockfd, uint8_t bit){
     for(i = 0;i<mb_size;i++)
       msg_vector.push_back(mb_buffer[i]);
 
+
+        //void *memset(void *s, int c, size_t n);
+    memset(n_buffer, 0, n_size);
+    free(n_buffer);
+    memset(e_buffer, 0, e_size);
+    free(e_buffer);
+    memset(r0_buffer, 0, r0_size);
+    free(r0_buffer);
+    memset(r1_buffer, 0, r1_size);
+    free(r1_buffer);
+    memset(bv_buffer, 0, bv_size);
+    free(bv_buffer);
+    memset(bv_buffer, 0, bv_size);
+    free(c0_buffer);
+    memset(bv_buffer, 0, bv_size);
+    free(c1_buffer);
+    memset(mb_buffer, 0, mb_size);
+    free(mb_buffer);
+
     return msg_vector;
 }
 
