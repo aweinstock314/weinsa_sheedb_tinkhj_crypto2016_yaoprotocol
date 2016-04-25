@@ -32,7 +32,7 @@ class TerriblyInsecureObliviousTransfer {
     static bytevector recv(int fd, uint8_t bit) {
         size_t len;
         read_aon(fd, (char*)&len, sizeof(size_t));
-        bytevector x(len,0), y(len,0);
+        bytevector x(len, 0), y(len, 0);
         read_aon(fd, (char*)x.data(), len);
         read_aon(fd, (char*)y.data(), len);
         return bit ? y : x;
@@ -116,6 +116,14 @@ bytevector uint64_t_to_bytevector(uint64_t wealth_) {
     return wealth;
 }
 
+void print_bytevector_as_bits(bytevector bv_) {
+    bitvector bv = unpack_bv(bv_);
+    size_t i, n=bv.size();
+    for(i=0; i<n; i++) {
+        printf("%d", !!bv[n-i-1]);
+    }
+}
+
 int sender_main(int, char** argv) {
     string hostname = argv[2];
     unsigned short port = (unsigned short) atoi(argv[2]);
@@ -193,7 +201,10 @@ int sender_main(int, char** argv) {
     Circuit c = generate_unsigned_compare_circuit( sizeof(wealth) * 8 );
     SenderGarbledCircuit sgc(c);
 
-    sgc.send<TerriblyInsecureObliviousTransfer>(sd, uint64_t_to_bytevector(wealth));
+    bytevector yao_result = sgc.send<TerriblyInsecureObliviousTransfer>(sd, uint64_t_to_bytevector(wealth));
+    printf("Result: ");
+    print_bytevector_as_bits(yao_result);
+    printf("\n");
 
     return 0;
 }
@@ -264,6 +275,10 @@ int receiver_main(int, char** argv) {
     //eval.execute_protocol(sd);
 
     ReceiverGarbledCircuit rgc(PhantomData<TerriblyInsecureObliviousTransfer>(), sd, uint64_t_to_bytevector(wealth));
+
+    printf("Result: ");
+    print_bytevector_as_bits(pack_bv(rgc.result));
+    printf("\n");
 
     return 0;
 }
