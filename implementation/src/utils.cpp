@@ -43,3 +43,11 @@ bytevector pack_bv(bitvector x) {
 }
 
 void nopprintf(FILE*, const char*, ...) {}
+
+void print_bytevector_as_bits(bytevector bv_) {
+    bitvector bv = unpack_bv(bv_);
+    size_t i, n=bv.size();
+    for(i=0; i<n; i++) {
+        printf("%d", !!bv[n-i-1]);
+    }
+}

@@ -27,4 +27,6 @@ void nopprintf(FILE*, const char*, ...);
 #define dbgprintf nopprintf
 #endif
 
+void print_bytevector_as_bits(bytevector bv_);
+
 #endif

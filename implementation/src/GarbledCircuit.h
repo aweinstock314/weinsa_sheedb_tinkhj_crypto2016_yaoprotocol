@@ -63,6 +63,8 @@ template<class OT> bytevector SenderGarbledCircuit::send(int fd, bytevector x_) 
     dbgprintf(stderr, "Serializing sigmas\n");
     for(i=0; i<c.num_bits; i++) {
         bool sigma = x[i] ^ lambdas[i];
+        dbgprintf(stderr, "lambdas[%lu] = %d\n", i, !!lambdas[i]);
+        dbgprintf(stderr, "x[%lu] = %d\n", i, !!x[i]);
         write_aon(fd, (char*)&sigma, sizeof(bool));
         dbgprintf(stderr, "sigmas[%lu] = %d\n", i, sigma);
     }
@@ -70,7 +72,7 @@ template<class OT> bytevector SenderGarbledCircuit::send(int fd, bytevector x_) 
     for(i=0; i<c.num_bits; i++) {
         bool lambda = lambdas[i+c.num_bits];
         write_aon(fd, (char*)&lambda, sizeof(bool));
-        dbgprintf(stderr, "lambdas[%lu] = %d\n", i, lambda);
+        dbgprintf(stderr, "lambdas[%lu] = %d\n", i+c.num_bits, lambda);
     }
     dbgprintf(stderr, "Serializing sender's keys\n");
     for(i=0; i<c.num_bits; i++) {
@@ -121,6 +123,7 @@ template<class OT> ReceiverGarbledCircuit::ReceiverGarbledCircuit(PhantomData<OT
         lambdas[i] = lambda;
         sigmas[num_bits+i] = y[i] ^ lambdas[i];
         dbgprintf(stderr, "lambdas[%lu] = %d\n", i, !!lambdas[i]);
+        dbgprintf(stderr, "sigmas[%lu] = %d\n", i+num_bits, !!sigmas[i+num_bits]);
     }
     dbgprintf(stderr, "Deserializing sender's keys\n");
     for(i=0; i<num_bits; i++) {

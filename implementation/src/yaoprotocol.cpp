@@ -116,18 +116,10 @@ bytevector uint64_t_to_bytevector(uint64_t wealth_) {
     return wealth;
 }
 
-void print_bytevector_as_bits(bytevector bv_) {
-    bitvector bv = unpack_bv(bv_);
-    size_t i, n=bv.size();
-    for(i=0; i<n; i++) {
-        printf("%d", !!bv[n-i-1]);
-    }
-}
-
 int sender_main(int, char** argv) {
     string hostname = argv[2];
-    unsigned short port = (unsigned short) atoi(argv[2]);
-    uint64_t wealth = (uint64_t) atoi(argv[3]);
+    unsigned short port = (unsigned short) atoi(argv[3]);
+    uint64_t wealth = (uint64_t) stoull(argv[4]);
     (void)hostname; (void)port; (void)wealth; // suppress -Wunused-but-set-variable
     int sd, rc;
     struct addrinfo hints;
@@ -201,11 +193,17 @@ int sender_main(int, char** argv) {
     Circuit c = generate_unsigned_compare_circuit( sizeof(wealth) * 8 );
     SenderGarbledCircuit sgc(c);
 
-    bytevector yao_result = sgc.send<TerriblyInsecureObliviousTransfer>(sd, uint64_t_to_bytevector(wealth));
+    bytevector x = uint64_t_to_bytevector(wealth);
+    printf("x = %lu = ", wealth);
+    print_bytevector_as_bits(x);
+    printf("\n");
+
+    bytevector yao_result = sgc.send<TerriblyInsecureObliviousTransfer>(sd, x);
     printf("Result: ");
     print_bytevector_as_bits(yao_result);
     printf("\n");
 
+    close(sd);
     return 0;
 }
 
@@ -274,12 +272,18 @@ int receiver_main(int, char** argv) {
     //ReceiverEvaluator eval = ReceiverEvaluator(sizeof(wealth) * 8);
     //eval.execute_protocol(sd);
 
-    ReceiverGarbledCircuit rgc(PhantomData<TerriblyInsecureObliviousTransfer>(), sd, uint64_t_to_bytevector(wealth));
+    bytevector y = uint64_t_to_bytevector(wealth);
+    printf("y = %lu = ", wealth);
+    print_bytevector_as_bits(y);
+    printf("\n");
+
+    ReceiverGarbledCircuit rgc(PhantomData<TerriblyInsecureObliviousTransfer>(), sd, y);
 
     printf("Result: ");
     print_bytevector_as_bits(pack_bv(rgc.result));
     printf("\n");
 
+    close(sd);
     return 0;
 }
 

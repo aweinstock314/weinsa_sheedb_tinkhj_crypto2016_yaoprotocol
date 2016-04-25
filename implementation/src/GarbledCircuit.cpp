@@ -10,7 +10,7 @@ void encrypt(uint8_t *dst, const uint8_t *src, const uint8_t *k1, const uint8_t 
     GARBLER_CIPHER::Encryption e1(k1, SEC_PARAM, iv), e2(k2, SEC_PARAM, iv);
     CryptoPP::StreamTransformationFilter stf1(e1, SINK), stf2(e2, SINK);
     stf2.PutMessageEnd(src, SEC_PARAM+1);
-    stf1.PutMessageEnd(src, SEC_PARAM+1);
+    stf1.PutMessageEnd(dst, SEC_PARAM+1);
 }
 
 void decrypt(uint8_t *dst, const uint8_t *src, const uint8_t *k1, const uint8_t *k2) {
@@ -19,7 +19,7 @@ void decrypt(uint8_t *dst, const uint8_t *src, const uint8_t *k1, const uint8_t 
     GARBLER_CIPHER::Decryption e1(k1, SEC_PARAM, iv), e2(k2, SEC_PARAM, iv);
     CryptoPP::StreamTransformationFilter stf1(e1, SINK), stf2(e2, SINK);
     stf1.PutMessageEnd(src, SEC_PARAM+1);
-    stf2.PutMessageEnd(src, SEC_PARAM+1);
+    stf2.PutMessageEnd(dst, SEC_PARAM+1);
 }
 #undef SINK
 
@@ -39,7 +39,10 @@ SenderGarbledCircuit::SenderGarbledCircuit(Circuit c_) :
         ones[i].resize(SEC_PARAM);
         read_aon(fd, (char*)zeros[i].data(), SEC_PARAM);
         read_aon(fd, (char*)ones[i].data(), SEC_PARAM);
-
+#ifdef INSECURE_DETERMINISTIC_DEBUG_HACKERY
+        memset((char*)zeros[i].data(), 0, SEC_PARAM);
+        memset((char*)ones[i].data(), ~0, SEC_PARAM);
+#endif
 
         if(boost::get<OutputWire>(&c.wires[i])) {
             // the output wires should not be blinded
@@ -53,6 +56,9 @@ SenderGarbledCircuit::SenderGarbledCircuit(Circuit c_) :
             // True
             lambdas[i] = temp<128 ? 1 : 0;
         }
+#ifdef INSECURE_DETERMINISTIC_DEBUG_HACKERY
+        lambdas[i] = 0;
+#endif
 
         // assumes a topological ordering, which is produced by generate_unsigned_compare_circuit
         //  it would be more elegant to walk the circuit starting from the outputs, but this is easier
@@ -84,6 +90,12 @@ SenderGarbledCircuit::SenderGarbledCircuit(Circuit c_) :
 #undef KEY
                 }}
                 p->gates.push_back(gw);
+
+                /*printf("k_%lu^0 = ", i);
+                print_bytevector_as_bits(p->zeros[i]);
+                printf("\nk_%lu^1 = ", i);
+                print_bytevector_as_bits(p->ones[i]);
+                printf("\n");*/
             }
         };
         boost::apply_visitor(matcher(this, i), c.wires[i]);
@@ -185,7 +197,11 @@ bitvector ReceiverGarbledCircuit::eval(const bitvector& y) {
             uint8_t buf[SEC_PARAM+1];
             decrypt(buf, w.values[p->sigmas[w.l]][p->sigmas[w.r]], p->keys[w.l].data(), p->keys[w.r].data());
             p->sigmas[i] = buf[SEC_PARAM];
+            dbgprintf(stderr, "p->keys[i].size() = %lu\n", p->keys[i].size());
             memcpy(p->keys[i].data(), buf, SEC_PARAM);
+            /*printf("\t");
+            print_bytevector_as_bits(p->keys[i]);
+            printf("\n");*/
         }
         void operator()(const OutputWire& w) {
             dbgprintf(stderr, "Evaluating gate %lu OutputWire(%lu)\n", i, w.index);

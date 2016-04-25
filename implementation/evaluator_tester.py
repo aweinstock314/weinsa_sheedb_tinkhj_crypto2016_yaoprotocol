@@ -16,13 +16,13 @@ def lessthan_garbled(x,y):
     pipe = subprocess.PIPE
     #stderr = None
     stderr = subprocess.PIPE
-    port = str(random.randint(8000, 10000))
+    port = str(random.randint(8000, 60000))
     print("Port: %s" % port)
+    print("%d, %d" % (x,y))
     r = subprocess.Popen(['./bin/yaoprotocol', 'receiver', port, str(y)], stdout=pipe, stderr=stderr)
     s = subprocess.Popen(['./bin/yaoprotocol', 'sender', 'localhost', port, str(x)], stdout=pipe, stderr=stderr)
-    (z2,_) = r.communicate()
     (z1,_) = s.communicate()
-    print("%d, %d" % (x,y))
+    (z2,_) = r.communicate()
     print("z1: %r" % z1)
     print("z2: %r" % z2)
     reg = 'Result: ([01]*)'
