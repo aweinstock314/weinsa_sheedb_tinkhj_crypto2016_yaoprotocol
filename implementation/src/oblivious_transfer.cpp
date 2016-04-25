@@ -26,6 +26,7 @@ void * calloc_wrapper(unsigned int num_members,unsigned int num_size);
 void * malloc_wrapper(unsigned int n);
 
 void ot_send(int sockfd,  bytevector msg1, bytevector msg2 ){
+  unsigned int i;
     //Setup RSA
     AutoSeededRandomPool prng;
     RSA::PrivateKey private_key;
@@ -133,6 +134,16 @@ void ot_send(int sockfd,  bytevector msg1, bytevector msg2 ){
     rc = write_aon(sockfd, (char*)buffer, buf_size);
     CHECK_RW(rc, buf_size, "Failed to write all bytes of m1'")
     delete[] buffer;
+
+#ifdef DBG_OT
+
+    fprintf(stderr,"\n[ot_send([...])]Message 1 is: ");
+    for(i = 0;i<msg1.size();i++)
+      fprintf(stderr,"0x%02x ",msg1[i]);
+    fprintf(stderr,"\n[ot_send([...])]Message 2 is: ");
+    for(i = 0;i<msg2.size();i++)
+      fprintf(stderr,"0x%02x %s",msg2[i],(i == (msg2.size() -1))?"\n":"");
+#endif
 }
 
 bytevector ot_recv(int sockfd, uint8_t bit){
@@ -161,7 +172,16 @@ bytevector ot_recv(int sockfd, uint8_t bit){
 
 
     //e_int.Decode(e_buffer,e_size,Integer::UNSIGNED);
+        #ifdef DBG_OT
+    //fprintf(stderr,"[ot_recv([...])]status: begin step  1\n");
+    #endif    
+        #ifdef DBG_OT
+    //fprintf(stderr,"[ot_recv([...])]status: begin step  2\n");
+    #endif    
     //Step 3
+#ifdef DBG_OT
+    //fprintf(stderr,"[ot_recv([...])]status: begin step  3\n");
+    #endif    
     //receive size for N
     recv(sockfd,(void *)&n_size,sizeof(unsigned int),0);
     n_buffer = (byte *)calloc_wrapper(n_size,sizeof(byte));
@@ -192,9 +212,14 @@ bytevector ot_recv(int sockfd, uint8_t bit){
 
     //Step 4
     //bit given as argument
+        #ifdef DBG_OT
+    //fprintf(stderr,"[ot_recv([...])]status: begin step  4\n");
+    #endif    
     
     //Step 5
-
+        #ifdef DBG_OT
+    //    fprintf(stderr,"[ot_recv([...])]status: begin step  5\n");
+    #endif    
     //Integer::Integer	(RandomNumberGenerator & rng,size_t bitCount )	
 
     Integer random_value( prng, 1024); //random value of 1024 BITS
@@ -219,9 +244,13 @@ bytevector ot_recv(int sockfd, uint8_t bit){
 
     //Step 6
     //N/A
-    
+        #ifdef DBG_OT
+    //    fprintf(stderr,"[ot_recv([...])]status: begin step  6\n");
+    #endif    
     //Step 7
-    
+        #ifdef DBG_OT
+    //    fprintf(stderr,"[ot_recv([...])]status: begin step  7\n");
+    #endif
     //receive size of c_0
     recv(sockfd,(void *)&c0_size,sizeof(unsigned int),0);
     c0_buffer = (byte *)calloc_wrapper(c0_size,sizeof(byte));
@@ -243,7 +272,9 @@ bytevector ot_recv(int sockfd, uint8_t bit){
 
     //step 8    
     //get message
-
+    #ifdef DBG_OT
+    //    fprintf(stderr,"[ot_recv([...])]status:begin step 8\n");
+      #endif
     //choose message
     mb_int = (bit)?(c1_int - random_value):(c0_int - random_value);
     mb_size = (bit)?(c_1_actual_size):(c_0_actual_size);
@@ -253,25 +284,43 @@ bytevector ot_recv(int sockfd, uint8_t bit){
     for(i = 0;i<mb_size;i++)
       msg_vector.push_back(mb_buffer[i]);
 
-
+        #ifdef DBG_OT
+    //    fprintf(stderr,"[ot_recv([...])]status: free them all!\n");
+    #endif    
         //void *memset(void *s, int c, size_t n);
     memset(n_buffer, 0, n_size);
     free(n_buffer);
+
     memset(e_buffer, 0, e_size);
     free(e_buffer);
+
     memset(r0_buffer, 0, r0_size);
     free(r0_buffer);
+
     memset(r1_buffer, 0, r1_size);
     free(r1_buffer);
+
     memset(bv_buffer, 0, bv_size);
     free(bv_buffer);
-    memset(bv_buffer, 0, bv_size);
+
+    memset(c0_buffer, 0, c0_size);
     free(c0_buffer);
-    memset(bv_buffer, 0, bv_size);
+
+    memset(c1_buffer, 0, c1_size);
     free(c1_buffer);
+
     memset(mb_buffer, 0, mb_size);
     free(mb_buffer);
 
+
+
+#ifdef DBG_OT
+    //fprintf(stderr,"[ot_recv([...])]status:begin step  ")
+    fprintf(stderr,"[ot_recv([...])][end] bit = %02x\n",bit);
+    fprintf(stderr,"[ot_recv([...])][end] ");
+    for(i = 0;i<msg_vector.size();i++)
+      fprintf(stderr,"0x%02x %s",msg_vector[i],(i == (msg_vector.size() -1))?"\n":"");
+    #endif
     return msg_vector;
 }
 
