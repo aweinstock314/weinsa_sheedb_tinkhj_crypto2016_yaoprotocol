@@ -4,24 +4,31 @@
 #include "GarbledCircuit.h"
 
 #define SINK (new CryptoPP::ArraySink(dst, SEC_PARAM+1))
+#define DEF(name, underlying) \
+void name(uint8_t *dst, const uint8_t *src, const uint8_t *k) { \
+    uint8_t iv[16]; \
+    memset(iv, 0, sizeof(iv)); \
+    GARBLER_CIPHER::underlying e(k, SEC_PARAM, iv); \
+    CryptoPP::StreamTransformationFilter stf(e, SINK); \
+    stf.PutMessageEnd(src, SEC_PARAM+1); \
+}
+
+DEF(single_encrypt,Encryption)
+DEF(single_decrypt,Decryption)
+#undef DEF
+#undef SINK
+
 void encrypt(uint8_t *dst, const uint8_t *src, const uint8_t *k1, const uint8_t *k2) {
-    uint8_t iv[16];
-    memset(iv, 0, sizeof(iv));
-    GARBLER_CIPHER::Encryption e1(k1, SEC_PARAM, iv), e2(k2, SEC_PARAM, iv);
-    CryptoPP::StreamTransformationFilter stf1(e1, SINK), stf2(e2, SINK);
-    stf2.PutMessageEnd(src, SEC_PARAM+1);
-    stf1.PutMessageEnd(dst, SEC_PARAM+1);
+    memcpy(dst, src, SEC_PARAM+1);
+    single_encrypt(dst, dst, k2);
+    single_encrypt(dst, dst, k1);
 }
 
 void decrypt(uint8_t *dst, const uint8_t *src, const uint8_t *k1, const uint8_t *k2) {
-    uint8_t iv[16];
-    memset(iv, 0, sizeof(iv));
-    GARBLER_CIPHER::Decryption e1(k1, SEC_PARAM, iv), e2(k2, SEC_PARAM, iv);
-    CryptoPP::StreamTransformationFilter stf1(e1, SINK), stf2(e2, SINK);
-    stf1.PutMessageEnd(src, SEC_PARAM+1);
-    stf2.PutMessageEnd(dst, SEC_PARAM+1);
+    memcpy(dst, src, SEC_PARAM+1);
+    single_decrypt(dst, dst, k1);
+    single_decrypt(dst, dst, k2);
 }
-#undef SINK
 
 // This uses the "Single-Party Garbling Scheme" described in section 3.1 of the paper
 //  "Efficient Three-Party Computation from Cut-and-Choose" by Choi, Katz, Malozemoff, and Zikas
@@ -44,22 +51,23 @@ SenderGarbledCircuit::SenderGarbledCircuit(Circuit c_) :
         memset((char*)ones[i].data(), ~0, SEC_PARAM);
 #endif
 
-        if(boost::get<OutputWire>(&c.wires[i])) {
+        // produce random bit for the blindings
+        read_aon(fd, (char*)&temp, 1);
+        // Extract a single bit of randomness from a full byte
+        // test is correct to extract the MSB without bias, as demonstrated by the following haskell
+        // ghci> length[0..127]==length[128..255]
+        // True
+        lambdas[i] = temp<128 ? 1 : 0;
+    }
+    for (i=0; i<c.wires.size(); i++) {
+        OutputWire *ow;
+        if((ow = boost::get<OutputWire>(&c.wires[i]))) {
             // the output wires should not be blinded
             lambdas[i] = 0;
-        } else {
-            // produce random bit for the blindings
-            read_aon(fd, (char*)&temp, 1);
-            // Extract a single bit of randomness from a full byte
-            // test is correct to extract the MSB without bias, as demonstrated by the following haskell
-            // ghci> length[0..127]==length[128..255]
-            // True
-            lambdas[i] = temp<128 ? 1 : 0;
+            lambdas[ow->index] = 0;
         }
-#ifdef INSECURE_DETERMINISTIC_DEBUG_HACKERY
-        lambdas[i] = 0;
-#endif
-
+    }
+    for (i=0; i<c.wires.size(); i++) {
         // assumes a topological ordering, which is produced by generate_unsigned_compare_circuit
         //  it would be more elegant to walk the circuit starting from the outputs, but this is easier
         struct matcher : public boost::static_visitor<> {
@@ -188,6 +196,7 @@ bitvector ReceiverGarbledCircuit::eval(const bitvector& y) {
         void operator()(const InputWire&) {
             assert(p->evaluated[i]);
             dbgprintf(stderr, "Evaluating gate %lu InputWire\n", i);
+            dbgprintf(stderr, "\tsigma = %d\n", !!p->sigmas[i]);
         }
         void operator()(const GarbledWire& w) {
             dbgprintf(stderr, "Evaluating gate %lu GarbledWire(%lu, %lu)\n", i, w.l, w.r);
@@ -196,15 +205,18 @@ bitvector ReceiverGarbledCircuit::eval(const bitvector& y) {
             p->evaluated[i] = true;
             uint8_t buf[SEC_PARAM+1];
             decrypt(buf, w.values[p->sigmas[w.l]][p->sigmas[w.r]], p->keys[w.l].data(), p->keys[w.r].data());
+            dbgprintf(stderr, "buf[SEC_PARAM] = %d\n", buf[SEC_PARAM]);
             p->sigmas[i] = buf[SEC_PARAM];
-            dbgprintf(stderr, "p->keys[i].size() = %lu\n", p->keys[i].size());
+            dbgprintf(stderr, "\tsigma = %d\n", !!p->sigmas[i]);
             memcpy(p->keys[i].data(), buf, SEC_PARAM);
-            /*printf("\t");
-            print_bytevector_as_bits(p->keys[i]);
-            printf("\n");*/
+
+            /*printf("\tL "); print_bytevector_as_bits(p->keys[w.l]); printf("\n");
+            printf("\tR "); print_bytevector_as_bits(p->keys[w.r]); printf("\n");
+            printf("\t- "); print_bytevector_as_bits(p->keys[i]); printf("\n");*/
         }
         void operator()(const OutputWire& w) {
             dbgprintf(stderr, "Evaluating gate %lu OutputWire(%lu)\n", i, w.index);
+            dbgprintf(stderr, "\tsigma = %d\n", !!p->sigmas[w.index]);
             assert(p->evaluated[w.index]);
             output->push_back(p->sigmas[w.index]);
         }

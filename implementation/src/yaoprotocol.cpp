@@ -1,14 +1,16 @@
 #include <bitset>
+#include <fcntl.h>
 #include <iostream>
 #include <netdb.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 #include <string>
+#include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
-#include <vector>
 #include <time.h>
+#include <vector>
 
 #include "Circuit.h"
 #include "GarbledCircuit.h"
@@ -190,14 +192,19 @@ int sender_main(int, char** argv) {
 
     //SenderEvaluator eval = SenderEvaluator( sizeof(wealth) * 8 );
     //eval.execute_protocol(sd);
-    Circuit c = generate_unsigned_compare_circuit( sizeof(wealth) * 8 );
-    SenderGarbledCircuit sgc(c);
 
+    // TODO: arbitrary-precision wealth
     bytevector x = uint64_t_to_bytevector(wealth);
     printf("x = %lu = ", wealth);
     print_bytevector_as_bits(x);
     printf("\n");
+    x.resize(1); //UGLY HACK TO GET 8-bit circuit
 
+    Circuit c = generate_unsigned_compare_circuit( x.size() * 8 );
+    SenderGarbledCircuit sgc(c);
+
+
+    //bytevector yao_result = sgc.send<RSAObliviousTransfer>(sd, x);
     bytevector yao_result = sgc.send<TerriblyInsecureObliviousTransfer>(sd, x);
     printf("Result: ");
     print_bytevector_as_bits(yao_result);
@@ -276,7 +283,9 @@ int receiver_main(int, char** argv) {
     printf("y = %lu = ", wealth);
     print_bytevector_as_bits(y);
     printf("\n");
+    y.resize(1);
 
+    //ReceiverGarbledCircuit rgc(PhantomData<RSAObliviousTransfer>(), sd, y);
     ReceiverGarbledCircuit rgc(PhantomData<TerriblyInsecureObliviousTransfer>(), sd, y);
 
     printf("Result: ");
@@ -332,6 +341,31 @@ int test_main(int, char**){
     cout << endl;
     byv = pack_bv(biv);
     cout << bitset<8>(byv[0]) << " " << bitset<8>(byv[1]) << endl;
+    return 0;
+}
+
+int test_encryption_main(int, char**) {
+    int fd = open("/dev/urandom", O_RDONLY);
+    bytevector k1(SEC_PARAM), k2(SEC_PARAM);
+    bytevector data(SEC_PARAM+1), result1(SEC_PARAM+1), result2(SEC_PARAM+1);
+
+#define RANDOM_POPULATE(vec) read_aon(fd, (char*)(vec).data(), (vec).size());
+    RANDOM_POPULATE(k1)
+    RANDOM_POPULATE(k2)
+    RANDOM_POPULATE(data)
+#undef RANDOM_POPULATE
+
+    printf("k1 =\t\t"); print_bytevector_as_bits(k1); printf("\n");
+    printf("k2 =\t\t"); print_bytevector_as_bits(k2); printf("\n");
+
+    encrypt(result1.data(), data.data(), k1.data(), k2.data());
+    decrypt(result2.data(), result1.data(), k1.data(), k2.data());
+
+    printf("result1 =\t"); print_bytevector_as_bits(result1); printf("\n");
+    printf("data =\t\t"); print_bytevector_as_bits(data); printf("\n");
+    printf("result2 =\t"); print_bytevector_as_bits(result2); printf("\n");
+
+    close(fd);
     return 0;
 }
 
@@ -391,10 +425,10 @@ int main(int argc, char** argv) {
     if(!strcmp("test", argv[1])){
         return test_main(argc, argv);
     }
+    if(!strcmp("test_encryption", argv[1])) {
+        return test_encryption_main(argc, argv);
+    }
 
     print_usage();
     return EXIT_FAILURE;
 }
-
-
-

@@ -133,7 +133,7 @@ template<class OT> ReceiverGarbledCircuit::ReceiverGarbledCircuit(PhantomData<OT
     }
     dbgprintf(stderr, "OTing receiver's keys\n");
     for(i=0; i<num_bits; i++) {
-        keys[i+num_bits] = OT::recv(fd, y[i] ^ lambdas[i]);
+        keys[i+num_bits] = OT::recv(fd, sigmas[num_bits+i]);
         evaluated[i+num_bits] = true;
     }
 

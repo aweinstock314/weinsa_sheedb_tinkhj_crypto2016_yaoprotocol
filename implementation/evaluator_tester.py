@@ -26,22 +26,31 @@ def lessthan_garbled(x,y):
     print("z1: %r" % z1)
     print("z2: %r" % z2)
     reg = 'Result: ([01]*)'
-    return bool(int(re.findall(reg, z1)[0], 10))
+    try:
+        res = bool(int(re.findall(reg, z1)[0], 10))
+        print(res)
+        return res
+    except:
+        # treat bind failures/hangs as failures
+        return None
 
 def try_random_inputs(howmany, maxval, lessthan=lessthan_ungarbled):
     r = lambda: random.randint(0, maxval)
+    num_wrong = 0
     for i in range(howmany):
         if not i % 100:
             print('Iteration %d' % (i,))
         x, y = r(), r()
         b = lessthan(x,y)
         if (x < y) != b:
+            num_wrong += 1
             print('Found counterexample: %d, %d' % (x,y))
             print(x < y)
             print(b)
             print('---')
+    print("wrongness: %d/%d" % (num_wrong, howmany))
 
 if __name__ == '__main__':
-    #try_random_inputs(1000, 2**8)
-    #try_random_inputs(1000, 2**64)
-    try_random_inputs(100, 2**8, lessthan=lessthan_garbled)
+    #try_random_inputs(1000, 2**8-1)
+    #try_random_inputs(1000, 2**64-1)
+    try_random_inputs(100, 2**8-1, lessthan=lessthan_garbled)
