@@ -60,17 +60,23 @@ template<class OT> bytevector SenderGarbledCircuit::send(int fd, bytevector x_) 
     size_t i;
     write_aon(fd, (char*)&c.num_bits, sizeof(size_t));
     serialize_gc(fd, gates);
+    dbgprintf(stderr, "Serializing sigmas\n");
     for(i=0; i<c.num_bits; i++) {
         bool sigma = x[i] ^ lambdas[i];
         write_aon(fd, (char*)&sigma, sizeof(bool));
+        dbgprintf(stderr, "sigmas[%lu] = %d\n", i, sigma);
     }
+    dbgprintf(stderr, "Serializing lambdas\n");
     for(i=0; i<c.num_bits; i++) {
-        bool tmp = lambdas[i+c.num_bits];
-        write_aon(fd, (char*)&tmp, sizeof(bool));
+        bool lambda = lambdas[i+c.num_bits];
+        write_aon(fd, (char*)&lambda, sizeof(bool));
+        dbgprintf(stderr, "lambdas[%lu] = %d\n", i, lambda);
     }
+    dbgprintf(stderr, "Serializing sender's keys\n");
     for(i=0; i<c.num_bits; i++) {
         write_aon(fd, (char*)(x[i] ^ lambdas[i] ? ones[i] : zeros[i]).data(), SEC_PARAM);
     }
+    dbgprintf(stderr, "OTing receiver's keys\n");
     for(i=0; i<c.num_bits; i++) {
         OT::send(fd, zeros[i], ones[i]); // todo: architechture for parallelism
     }
@@ -78,6 +84,8 @@ template<class OT> bytevector SenderGarbledCircuit::send(int fd, bytevector x_) 
     bytevector result;
     size_t output_size;
     read_aon(fd, (char*)&output_size, sizeof(size_t));
+    dbgprintf(stderr, "output_size: %lu\n", output_size);
+    result.resize(output_size);
     read_aon(fd, (char*)result.data(), output_size);
 
     return result;
@@ -99,22 +107,28 @@ template<class OT> ReceiverGarbledCircuit::ReceiverGarbledCircuit(PhantomData<OT
     keys.resize(gates.size(), vector<uint8_t>(SEC_PARAM, 0));
     lambdas.resize(num_bits);
 
+    dbgprintf(stderr, "Deserializing sigmas\n");
     for(i=0; i<num_bits; i++) {
         bool sigma;
         read_aon(fd, (char*)&sigma, sizeof(bool));
         sigmas[i] = sigma;
+        dbgprintf(stderr, "sigmas[%lu] = %d\n", i, !!sigmas[i]);
     }
+    dbgprintf(stderr, "Deserializing lambdas\n");
     for(i=0; i<num_bits; i++) {
-        bool tmp;
-        read_aon(fd, (char*)&tmp, sizeof(bool));
-        lambdas[i] = tmp;
+        bool lambda;
+        read_aon(fd, (char*)&lambda, sizeof(bool));
+        lambdas[i] = lambda;
         sigmas[num_bits+i] = y[i] ^ lambdas[i];
+        dbgprintf(stderr, "lambdas[%lu] = %d\n", i, !!lambdas[i]);
     }
+    dbgprintf(stderr, "Deserializing sender's keys\n");
     for(i=0; i<num_bits; i++) {
         keys[i].resize(SEC_PARAM);
-        write_aon(fd, (char*)keys[i].data(), SEC_PARAM);
+        read_aon(fd, (char*)keys[i].data(), SEC_PARAM);
         evaluated[i] = true;
     }
+    dbgprintf(stderr, "OTing receiver's keys\n");
     for(i=0; i<num_bits; i++) {
         keys[i+num_bits] = OT::recv(fd, y[i] ^ lambdas[i]);
         evaluated[i+num_bits] = true;

@@ -41,3 +41,5 @@ bytevector pack_bv(bitvector x) {
     if(i != 0) { y.push_back(tmp); }
     return y;
 }
+
+void nopprintf(FILE*, const char*, ...) {}
