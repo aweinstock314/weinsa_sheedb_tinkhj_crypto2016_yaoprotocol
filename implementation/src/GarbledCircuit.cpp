@@ -68,7 +68,7 @@ SenderGarbledCircuit::SenderGarbledCircuit(Circuit c_) :
             }
             void operator()(GateWire& w) const {
                 size_t j, k;
-                dbgprintf("Creation of garbled gate %lu: %lu, %lu\n", i, w.l, w.r);
+                dbgprintf(stderr, "Creation of garbled gate %lu: %lu, %lu\n", i, w.l, w.r);
                 GarbledWire gw;
                 gw.l = w.l; gw.r = w.r;
                 for(j = 0; j <= 1; j++) { for(k = 0; k <= 1; k++) {
@@ -96,20 +96,20 @@ void serialize_gc(int fd, const vector<GarbledGate>& gc) {
         serializer(int fd_) : fd(fd_) {}
         void operator()(const InputWire& w) {
             char who = tag_to_bool(w.who) ? 'S' : 'R';
-            dbgprintf("Serializing InputWire(%c, %lu)\n", who, w.index);
+            dbgprintf(stderr, "Serializing InputWire(%c, %lu)\n", who, w.index);
             write_aon(fd, "0", sizeof(char));
             write_aon(fd, &who, sizeof(char));
             write_aon(fd, (char*)&w.index, sizeof(size_t));
         }
         void operator()(const GarbledWire& w) {
-            dbgprintf("Serializing GarbledWire(%lu, %lu)\n", w.l, w.r);
+            dbgprintf(stderr, "Serializing GarbledWire(%lu, %lu)\n", w.l, w.r);
             write_aon(fd, "1", sizeof(char));
             write_aon(fd, (char*)&w.values[0][0][0], 2 * 2 * (SEC_PARAM+1)*sizeof(uint8_t));
             write_aon(fd, (char*)&w.l, sizeof(size_t));
             write_aon(fd, (char*)&w.r, sizeof(size_t));
         }
         void operator()(const OutputWire& w) {
-            dbgprintf("Serializing OutputWire(%lu)\n", w.index);
+            dbgprintf(stderr, "Serializing OutputWire(%lu)\n", w.index);
             write_aon(fd, "2", sizeof(char));
             write_aon(fd, (char*)&w.index, sizeof(w.index));
         }
@@ -131,7 +131,7 @@ GarbledGate deserialize_gate(int fd) {
             read_aon(fd, &who, sizeof(char));
             size_t index;
             read_aon(fd, (char*)&index, sizeof(size_t));
-            dbgprintf("Deserializing InputWire(%c, %lu)\n", who, index);
+            dbgprintf(stderr, "Deserializing InputWire(%c, %lu)\n", who, index);
             return InputWire(index, bool_to_tag(who == 'S' ? true : false));
         }
         case '1': {
@@ -139,13 +139,13 @@ GarbledGate deserialize_gate(int fd) {
             read_aon(fd, (char*)&w.values[0][0][0], 2 * 2 * (SEC_PARAM+1)*sizeof(uint8_t));
             read_aon(fd, (char*)&w.l, sizeof(size_t));
             read_aon(fd, (char*)&w.r, sizeof(size_t));
-            dbgprintf("Deserializing GarbledWire(%lu, %lu)\n", w.l, w.r);
+            dbgprintf(stderr, "Deserializing GarbledWire(%lu, %lu)\n", w.l, w.r);
             return w;
         }
         case '2': {
             size_t index;
             read_aon(fd, (char*)&index, sizeof(size_t));
-            dbgprintf("Deserializing OutputWire(%lu)\n", index);
+            dbgprintf(stderr, "Deserializing OutputWire(%lu)\n", index);
             return OutputWire(index);
         }
         default: {
@@ -175,10 +175,10 @@ bitvector ReceiverGarbledCircuit::eval(const bitvector& y) {
         // TODO: support non-topological ordering (currently the asserts will fail if given a non-topological circuit)
         void operator()(const InputWire&) {
             assert(p->evaluated[i]);
-            dbgprintf("Evaluating gate %lu InputWire\n", i);
+            dbgprintf(stderr, "Evaluating gate %lu InputWire\n", i);
         }
         void operator()(const GarbledWire& w) {
-            dbgprintf("Evaluating gate %lu GarbledWire(%lu, %lu)\n", i, w.l, w.r);
+            dbgprintf(stderr, "Evaluating gate %lu GarbledWire(%lu, %lu)\n", i, w.l, w.r);
             assert(p->evaluated[w.l]);
             assert(p->evaluated[w.r]);
             p->evaluated[i] = true;
@@ -188,7 +188,7 @@ bitvector ReceiverGarbledCircuit::eval(const bitvector& y) {
             memcpy(p->keys[i].data(), buf, SEC_PARAM);
         }
         void operator()(const OutputWire& w) {
-            dbgprintf("Evaluating gate %lu OutputWire(%lu)\n", i, w.index);
+            dbgprintf(stderr, "Evaluating gate %lu OutputWire(%lu)\n", i, w.index);
             assert(p->evaluated[w.index]);
             output->push_back(p->sigmas[w.index]);
         }

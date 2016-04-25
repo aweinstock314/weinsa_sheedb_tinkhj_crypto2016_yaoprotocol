@@ -42,4 +42,4 @@ bytevector pack_bv(bitvector x) {
     return y;
 }
 
-void nopprintf(const char*, ...) {}
+void nopprintf(FILE*, const char*, ...) {}

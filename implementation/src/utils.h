@@ -19,10 +19,10 @@ bytevector pack_bv(bitvector x);
 
 template <class T> struct PhantomData {};
 
-void nopprintf(const char*, ...);
+void nopprintf(FILE*, const char*, ...);
 
 #ifndef NDEBUG
-#define dbgprintf printf
+#define dbgprintf fprintf
 #else
 #define dbgprintf nopprintf
 #endif
