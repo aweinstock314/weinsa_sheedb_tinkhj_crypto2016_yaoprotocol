@@ -1,7 +1,7 @@
 //Oblivious transfer based off the RSA implementation on Wikipedia
 
 #include <iostream>
-//#include <crypto++.h>
+//#include <cryptopp.h>
 //#include <cryptopp.h>
 //#include <cryptlib.h>
 //#include <crptopp/rsa.h>
@@ -25,7 +25,8 @@ using namespace CryptoPP;
 void * calloc_wrapper(unsigned int num_members,unsigned int num_size);
 void * malloc_wrapper(unsigned int n);
 
-void ot_send(int sockfd,  bytevector msg1, bytevector msg2 ){
+
+void RSAObliviousTransfer::send(int sockfd,  bytevector msg1, bytevector msg2 ){
   unsigned int i;
     //Setup RSA
     AutoSeededRandomPool prng;
@@ -146,7 +147,7 @@ void ot_send(int sockfd,  bytevector msg1, bytevector msg2 ){
 #endif
 }
 
-bytevector ot_recv(int sockfd, uint8_t bit){
+bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
   //(void)sockfd; (void)bit;
 
 
@@ -166,9 +167,6 @@ bytevector ot_recv(int sockfd, uint8_t bit){
     Integer bv_int,c0_int,c1_int,cb_int,mb_int;
     AutoSeededRandomPool prng;
     bytevector msg_vector;
-    //ssize_t recv(int sockfd, void *buf, size_t len, int flags);
-
-    //void Integer::Decode(const byte * input,size_t inputLen, Signedness sign = UNSIGNED )	
 
 
     //e_int.Decode(e_buffer,e_size,Integer::UNSIGNED);
@@ -178,37 +176,38 @@ bytevector ot_recv(int sockfd, uint8_t bit){
         #ifdef DBG_OT
     //fprintf(stderr,"[ot_recv([...])]status: begin step  2\n");
     #endif    
+
     //Step 3
 #ifdef DBG_OT
     //fprintf(stderr,"[ot_recv([...])]status: begin step  3\n");
     #endif    
     //receive size for N
-    recv(sockfd,(void *)&n_size,sizeof(unsigned int),0);
-    n_buffer = (byte *)calloc_wrapper(n_size,sizeof(byte));
+    read_aon(sockfd, (char*)&n_size, sizeof(unsigned int));
+    n_buffer = (byte*)calloc_wrapper(n_size, sizeof(byte));
     //receive contents of N
-    recv(sockfd,(void *)n_buffer,n_size,0);
-    n_int.Decode(n_buffer,n_size,Integer::UNSIGNED);
+    read_aon(sockfd, (char*)n_buffer, n_size);
+    n_int.Decode(n_buffer, n_size, Integer::UNSIGNED);
     //recieve size for e
-    recv(sockfd, (void *)&e_size,sizeof(unsigned int),0);
-    e_buffer = (byte *)calloc_wrapper(e_size,sizeof(byte));
+    read_aon(sockfd, (char*)&e_size, sizeof(unsigned int));
+    e_buffer = (byte *)calloc_wrapper(e_size, sizeof(byte));
     //receive the contents of e
-    recv(sockfd,(void *)e_buffer,e_size,0);
-    e_int.Decode(e_buffer,e_size,Integer::UNSIGNED);
+    read_aon(sockfd, (char*)e_buffer, e_size);
+    e_int.Decode(e_buffer, e_size, Integer::UNSIGNED);
     //f.Decode(buff_n,n.ByteCount(),Integer::UNSIGNED);
 
     //receive the size of r_0
-    recv(sockfd,(void *)&r0_size,sizeof(unsigned int),0);
-    r0_buffer = (byte *)calloc_wrapper(r0_size,sizeof(byte));
+    read_aon(sockfd, (char*)&r0_size, sizeof(unsigned int));
+    r0_buffer = (byte *)calloc_wrapper(r0_size, sizeof(byte));
     //receive the contents of r_0
-    recv(sockfd,(void *)r0_buffer,r0_size,0);
-    r0_int.Decode(r0_buffer,r0_size,Integer::UNSIGNED);
+    read_aon(sockfd, (char*)r0_buffer, r0_size);
+    r0_int.Decode(r0_buffer, r0_size, Integer::UNSIGNED);
 
     //receive the size of r_1
-    recv(sockfd,(void *)&r1_size,sizeof(unsigned int),0);
-    r1_buffer = (byte *)calloc_wrapper(r1_size,sizeof(byte));
+    read_aon(sockfd, (char*)&r1_size, sizeof(unsigned int));
+    r1_buffer = (byte *)calloc_wrapper(r1_size, sizeof(byte));
     //receive the contents of r_1
-    recv(sockfd,(void *)r1_buffer,r1_size,0);
-    r1_int.Decode(r1_buffer,r1_size,Integer::UNSIGNED);
+    read_aon(sockfd, (char*)r1_buffer, r1_size);
+    r1_int.Decode(r1_buffer, r1_size, Integer::UNSIGNED);
 
     //Step 4
     //bit given as argument
@@ -235,12 +234,12 @@ bytevector ot_recv(int sockfd, uint8_t bit){
     bv_int = (rb_int + a_exp_b_mod_c(random_value,e_int,n_int)) % n_int;
     bv_size = bv_int.ByteCount();    //get size (in bytes)
     //allocate heap block for buffer
-    bv_buffer = (byte *) calloc_wrapper(bv_size,sizeof(byte));
+    bv_buffer = (byte *) calloc_wrapper(bv_size, sizeof(byte));
     bv_int.Encode(bv_buffer, bv_size);
     //send size of blinded value
-    send(sockfd,(void *)&bv_size,sizeof(unsigned int),0);
+    write_aon(sockfd, (char*)&bv_size, sizeof(unsigned int));
     //send contents of blinded value
-    send(sockfd,(void *)bv_buffer,bv_size,0);
+    write_aon(sockfd, (char*)bv_buffer, bv_size);
 
     //Step 6
     //N/A
@@ -252,23 +251,23 @@ bytevector ot_recv(int sockfd, uint8_t bit){
     //    fprintf(stderr,"[ot_recv([...])]status: begin step  7\n");
     #endif
     //receive size of c_0
-    recv(sockfd,(void *)&c0_size,sizeof(unsigned int),0);
-    c0_buffer = (byte *)calloc_wrapper(c0_size,sizeof(byte));
+    read_aon(sockfd, (char*)&c0_size, sizeof(unsigned int));
+    c0_buffer = (byte *)calloc_wrapper(c0_size, sizeof(byte));
     unsigned int c_0_actual_size;
-    recv(sockfd, (void*)&c_0_actual_size, sizeof(c_0_actual_size), 0);
+    read_aon(sockfd, (char*)&c_0_actual_size, sizeof(c_0_actual_size));
     //receive contents of c_0
-    recv(sockfd,(void *)c0_buffer,c0_size,0);
-    c0_int.Decode(c0_buffer,c0_size,Integer::UNSIGNED);
+    read_aon(sockfd, (char*)c0_buffer, c0_size);
+    c0_int.Decode(c0_buffer, c0_size, Integer::UNSIGNED);
 
 
     //receive size of c_1
-    recv(sockfd,(void *)&c1_size,sizeof(unsigned int),0);
-    c1_buffer = (byte *)calloc_wrapper(c1_size,sizeof(byte));
+    read_aon(sockfd, (char*)&c1_size, sizeof(unsigned int));
+    c1_buffer = (byte *)calloc_wrapper(c1_size, sizeof(byte));
     unsigned int c_1_actual_size;
-    recv(sockfd, (void*)&c_1_actual_size, sizeof(c_1_actual_size), 0);
+    read_aon(sockfd, (char*)&c_1_actual_size, sizeof(c_1_actual_size));
     //receive contents of c_1
-    recv(sockfd,(void *)c1_buffer,c1_size,0);
-    c1_int.Decode(c1_buffer,c1_size,Integer::UNSIGNED);
+    read_aon(sockfd, (char*)c1_buffer, c1_size);
+    c1_int.Decode(c1_buffer, c1_size, Integer::UNSIGNED);
 
     //step 8    
     //get message
@@ -278,9 +277,9 @@ bytevector ot_recv(int sockfd, uint8_t bit){
     //choose message
     mb_int = (bit)?(c1_int - random_value):(c0_int - random_value);
     mb_size = (bit)?(c_1_actual_size):(c_0_actual_size);
-    mb_buffer = (byte *)calloc(mb_size,sizeof(byte));
+    mb_buffer = (byte *)calloc(mb_size, sizeof(byte));
     //change to string
-    mb_int.Encode(mb_buffer,mb_size,Integer::UNSIGNED);
+    mb_int.Encode(mb_buffer, mb_size, Integer::UNSIGNED);
     for(i = 0;i<mb_size;i++)
       msg_vector.push_back(mb_buffer[i]);
 

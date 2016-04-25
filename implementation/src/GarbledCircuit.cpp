@@ -1,4 +1,4 @@
-#include <crypto++/filters.h>
+#include <cryptopp/filters.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "GarbledCircuit.h"
@@ -94,12 +94,15 @@ void serialize_gc(int fd, const vector<GarbledGate>& gc) {
             write_aon(fd, tag_to_bool(w.who) ? "S" : "R", sizeof(char));
             write_aon(fd, (char*)w.index, sizeof(w.index));
         }
-        // TODO: serialization of {GarbledWire, OutputWire}
         void operator()(const GarbledWire& w) {
-            (void)w;
+            write_aon(fd, "1", sizeof(char));
+            write_aon(fd, (char*)&w.values[0][0][0], 2 * 2 * (SEC_PARAM+1)*sizeof(uint8_t));
+            write_aon(fd, (char*)&w.l, sizeof(size_t));
+            write_aon(fd, (char*)&w.r, sizeof(size_t));
         }
         void operator()(const OutputWire& w) {
-            (void)w;
+            write_aon(fd, "2", sizeof(char));
+            write_aon(fd, (char*)w.index, sizeof(w.index));
         }
     };
     size_t i, n = gc.size();
@@ -121,7 +124,18 @@ GarbledGate deserialize_gate(int fd) {
             read_aon(fd, (char*)&index, sizeof(size_t));
             return InputWire(index, bool_to_tag(who == 'S' ? true : false));
         }
-        // TODO: deserialization of {GarbledWire, OutputWire}
+        case '1': {
+            GarbledWire w;
+            read_aon(fd, (char*)&w.values[0][0][0], 2 * 2 * (SEC_PARAM+1)*sizeof(uint8_t));
+            read_aon(fd, (char*)&w.l, sizeof(size_t));
+            read_aon(fd, (char*)&w.r, sizeof(size_t));
+            return w;
+        }
+        case '2': {
+            size_t index;
+            read_aon(fd, (char*)&index, sizeof(size_t));
+            return OutputWire(index);
+        }
         default: {
             printf("deserialize_gate: wonky flag value %d\n", flag);
             exit(1);
@@ -131,37 +145,46 @@ GarbledGate deserialize_gate(int fd) {
 
 vector<GarbledGate> deserialize_gc(int fd) {
     vector<GarbledGate> gc;
-    size_t n;
+    size_t i, n;
     read_aon(fd, (char*)&n, sizeof(size_t));
+    for(i=0; i<n; i++) {
+        gc.push_back(deserialize_gate(fd));
+    }
     return gc;
 }
 
-template<class OT> void SenderGarbledCircuit::send(int fd, bytevector x_) {
-    bitvector x = unpack_bv(x_);
+bitvector ReceiverGarbledCircuit::eval(const bitvector& y) {
+    struct eval_garbled_wire : public static_visitor<> {
+        ReceiverGarbledCircuit *p;
+        const bitvector *y;
+        bitvector *output;
+        size_t i;
+        eval_garbled_wire(ReceiverGarbledCircuit *parent, const bitvector *y_, bitvector *output_, size_t i_) : p(parent), y(y_), output(output_), i(i_) {}
+        // TODO: support non-topological ordering (currently the asserts will fail if given a non-topological circuit)
+        void operator()(const InputWire&) {
+            assert(p->evaluated[i]);
+        }
+        void operator()(const GarbledWire& w) {
+            assert(p->evaluated[w.l]);
+            assert(p->evaluated[w.r]);
+            p->evaluated[i] = true;
+            uint8_t buf[SEC_PARAM+1];
+            decrypt(buf, w.values[p->sigmas[w.l]][p->sigmas[w.r]], p->keys[w.l].data(), p->keys[w.r].data());
+            p->sigmas[i] = buf[SEC_PARAM];
+            memcpy(p->keys[i].data(), buf, SEC_PARAM);
+        }
+        void operator()(const OutputWire& w) {
+            assert(p->evaluated[w.index]);
+            output->push_back(p->sigmas[w.index]);
+        }
+    };
     size_t i;
-    for(i=0; i<x.size(); i++) {
-        write_aon(fd, (x[i] ? ones[i] : zeros[i]).data(), SEC_PARAM);
-    }
-    // x.size() == y.size() invariant should be enforced elsewhere
-    for(i=0; i<x.size(); i++) {
-        OT::send(fd, zeros[i], ones[i]); // todo: architechture for parallelism
-    }
-}
+    bitvector output;
 
-template<class OT> ReceiverGarbledCircuit::ReceiverGarbledCircuit(int fd, bytevector y_) {
-    bitvector y = unpack_bv(y_);
-    size_t num_bits = y.size();
-
-    keys.resize(num_bits);
-    evaluated.resize(num_bits, false);
-    lambdas.resize(num_bits);
-
-    size_t i;
-    for(i=0; i<num_bits; i++) {
-        keys[i].resize(SEC_PARAM);
-        write_aon(fd, keys[i].data(), SEC_PARAM);
+    for(i=0; i<gates.size(); i++) {
+        eval_garbled_wire egw(this, &y, &output, i);
+        boost::apply_visitor(egw, gates[i]);
     }
-    for(i=0; i<num_bits; i++) {
-        keys[i+num_bits] = OT::recv(fd, y[i]);
-    }
+
+    return output;
 }

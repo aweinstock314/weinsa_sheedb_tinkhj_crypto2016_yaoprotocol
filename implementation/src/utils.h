@@ -17,4 +17,5 @@ bitvector unpack_bv(bytevector x);
 //Packs a bit vector into a bytevector
 bytevector pack_bv(bitvector x);
 
+template <class T> struct PhantomData {};
 #endif
