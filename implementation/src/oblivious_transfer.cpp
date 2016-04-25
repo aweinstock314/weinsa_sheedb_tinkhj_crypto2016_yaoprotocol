@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <cryptopp/modarith.h>
 
 #include "oblivious_transfer.h"
 
@@ -84,6 +85,17 @@ void RSAObliviousTransfer::send(int sockfd,  bytevector msg1, bytevector msg2 ){
     CHECK_RW(rc, buf_size, "Failed to write all bytes of random message 2")
     delete[] rand_1;
     delete[] rand_2;
+    //cout << "Sent random message 1 " << rand_msg_1 << endl;
+    //cout << "Sent random message 2 " << rand_msg_2 << endl;
+
+    #ifdef DBG_OT
+    buf_size = d.ByteCount();
+    write_aon(sockfd, (char*)&buf_size, sizeof(buf_size));
+    buffer = new byte[buf_size];
+    d.Encode(buffer, buf_size);
+    write_aon(sockfd, (char*)buffer, buf_size);
+    delete[] buffer;
+    #endif
 
     //Receive receiver's blinded encryption
     rc = read_aon(sockfd, (char*)&buf_size, sizeof(buf_size));
@@ -95,8 +107,17 @@ void RSAObliviousTransfer::send(int sockfd,  bytevector msg1, bytevector msg2 ){
     delete[] buffer;
 
     //Calculate k's
+    //ModularArithmetic ma(n);
     Integer k0 = a_exp_b_mod_c((v - rand_msg_1), d, n);
     Integer k1 = a_exp_b_mod_c((v - rand_msg_2), d, n);
+    //Integer k0 = ma.Exponentiate((v - rand_msg_1), d);
+    //Integer k1 = ma.Exponentiate((v - rand_msg_2), d);
+    /*cout << "Sent modulus " << n << endl;
+    cout << "Sent exponent " << e << endl;
+    cout << "Using private exponent " << d << endl;
+    cout << "Received blinded value " << v << endl;
+    cout << "Computed value k0 " << k0 << endl;
+    cout << "Computed value k1 " << k1 << endl;*/
 
     //TODO: If weird errors show up during OT, check here for problems like endianness
     //Convert messages to Integers and do math
@@ -122,6 +143,8 @@ void RSAObliviousTransfer::send(int sockfd,  bytevector msg1, bytevector msg2 ){
     rc = write_aon(sockfd, (char*)buffer, buf_size);
     CHECK_RW(rc, buf_size, "Failed to write all bytes of m0'")
     delete[] buffer;
+    //cout << "Sent m0' " << m0_prime << endl;
+    //cout << "Sent m1' " << m1_prime << endl;
 
     buf_size = m1_prime.ByteCount();
     actual_size = msg2.size();
@@ -220,17 +243,31 @@ bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
     #endif    
     //Integer::Integer	(RandomNumberGenerator & rng,size_t bitCount )	
 
-    Integer random_value( prng, 1024); //random value of 1024 BITS
+    Integer random_value( prng, RAND_MESSAGE_SIZE_BITS); //random value of 1024 BITS
+    #ifdef DBG_OT
+    //random_value = Integer(3);
+    #endif
 
     Integer rb_int = (bit)? r1_int:r0_int; // if b = 0, then  ==> rb = r0; 
+    //cout << "Using random value " << random_value << endl;
+    //cout << "Using random message " << rb_int << endl;
     
 
     //a_times_b_mod_c(a,b,c)
     // a_exp_b_mod_c(a,b,c)
     // a_exp_b_mod_c(a,b,c)
 
+    #ifdef DBG_OT
+    unsigned int d_size;
+    read_aon(sockfd, (char*)&d_size, sizeof(d_size));
+    byte* buffer = new byte[d_size];
+    read_aon(sockfd, (char*)buffer, d_size);
+    Integer d = Integer(buffer, d_size);
+    delete[] buffer;
+    #endif
+
     //compute blinded value
-    bv_int = (rb_int + a_exp_b_mod_c(random_value,e_int,n_int)) % n_int;
+    bv_int = (rb_int + a_exp_b_mod_c(random_value, e_int, n_int)) % n_int;
     bv_size = bv_int.ByteCount();    //get size (in bytes)
     //allocate heap block for buffer
     bv_buffer = (byte *) calloc_wrapper(bv_size, sizeof(byte));
@@ -239,6 +276,28 @@ bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
     write_aon(sockfd, (char*)&bv_size, sizeof(unsigned int));
     //send contents of blinded value
     write_aon(sockfd, (char*)bv_buffer, bv_size);
+    //cout << "Used modulus " << n_int << endl;
+    //cout << "Used exponent " << e_int << endl;
+    //cout << "Generated k " << random_value << endl;
+
+    #ifdef DBG_OT
+    /*cout << "e * d mod n = " << a_times_b_mod_c(e_int, d, n_int) << endl;
+    Integer intermediate = bv_int - rb_int;
+    Integer calc_k3 = a_exp_b_mod_c(intermediate, d, n_int);
+    Integer calc_k = a_exp_b_mod_c((bv_int - rb_int), d, n_int);
+    cout << "Calculated k " << calc_k << endl;
+    ModularArithmetic ma(n_int);
+    Integer calc_k2 = ma.Exponentiate(random_value, d * e_int);
+    //Integer k1 = ma.Exponentiate((v - rand_msg_2), d);
+    Integer calc_k2 = (bv_int - rb_int);
+    Integer val = (bv_int - rb_int);
+    for(unsigned int j = 0; j < d; j++){
+        calc_k2 *= val;
+        calc_k2 %= n_int;
+    }
+    cout << "Calculated our own way k " << calc_k2 << endl;
+    cout << "Intermediate calc " << calc_k3 << endl;*/
+    #endif
 
     //Step 6
     //N/A
@@ -257,6 +316,7 @@ bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
     //receive contents of c_0
     read_aon(sockfd, (char*)c0_buffer, c0_size);
     c0_int.Decode(c0_buffer, c0_size, Integer::UNSIGNED);
+    //cout << "Received m0' " << c0_int << endl;
 
 
     //receive size of c_1
@@ -267,6 +327,7 @@ bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
     //receive contents of c_1
     read_aon(sockfd, (char*)c1_buffer, c1_size);
     c1_int.Decode(c1_buffer, c1_size, Integer::UNSIGNED);
+    //cout << "Received m1' " << c1_int << endl;
 
     //step 8    
     //get message

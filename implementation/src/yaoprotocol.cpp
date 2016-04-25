@@ -253,8 +253,8 @@ int receiver_main(int, char** argv) {
 
     #ifdef DBG_OT
     bytevector my_msg;
-    int rand_val = rand();
-    my_msg = RSAObliviousTransfer::recv(sd, (*((char*)&rand_val) & 0x01) );
+    //int rand_val = rand();
+    my_msg = RSAObliviousTransfer::recv(sd, 1);
 
     exit(0);
     #endif
