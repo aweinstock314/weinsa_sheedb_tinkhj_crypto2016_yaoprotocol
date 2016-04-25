@@ -28,7 +28,7 @@ class TerriblyInsecureObliviousTransfer {
         write_aon(fd, (char*)x.data(), len);
         write_aon(fd, (char*)y.data(), len);
     }
-    static bytevector receive(int fd, uint8_t bit) {
+    static bytevector recv(int fd, uint8_t bit) {
         size_t len;
         read_aon(fd, (char*)&len, sizeof(size_t));
         bytevector x(len,0), y(len,0);
@@ -105,6 +105,16 @@ Circuit generate_unsigned_compare_circuit(size_t num_bits) {
 /* Mains **********************************************************************/
 /******************************************************************************/
 
+bytevector uint64_t_to_bytevector(uint64_t wealth_) {
+    bytevector wealth;
+    uint8_t* p;
+    size_t i;
+    for(i=0, p=(uint8_t*)&wealth_; i < sizeof(wealth_); ++i, ++p) {
+        wealth.push_back(*p);
+    }
+    return wealth;
+}
+
 int sender_main(int, char** argv) {
     string hostname = argv[2];
     unsigned short port = (unsigned short) atoi(argv[2]);
@@ -145,8 +155,12 @@ int sender_main(int, char** argv) {
 
     freeaddrinfo(result);
 
-    SenderEvaluator eval = SenderEvaluator( sizeof(wealth) * 8 );
-    eval.execute_protocol(sd);
+    //SenderEvaluator eval = SenderEvaluator( sizeof(wealth) * 8 );
+    //eval.execute_protocol(sd);
+    Circuit c = generate_unsigned_compare_circuit( sizeof(wealth) * 8 );
+    SenderGarbledCircuit sgc(c);
+
+    sgc.send<TerriblyInsecureObliviousTransfer>(sd, uint64_t_to_bytevector(wealth));
     return 0;
 }
 
@@ -202,27 +216,26 @@ int receiver_main(int, char** argv) {
         return EXIT_FAILURE;
     }
 
-    ReceiverEvaluator eval = ReceiverEvaluator(sizeof(wealth) * 8);
-    eval.execute_protocol(sd);
+    //ReceiverEvaluator eval = ReceiverEvaluator(sizeof(wealth) * 8);
+    //eval.execute_protocol(sd);
+
+    ReceiverGarbledCircuit rgc(PhantomData<TerriblyInsecureObliviousTransfer>(), sd, uint64_t_to_bytevector(wealth));
     return 0;
 }
+
+
 
 int evaluator_main(int, char** argv) {
     // TODO: arbitrary precision integers
     uint64_t wealth1_ = (uint64_t) stoull(argv[2]);
     uint64_t wealth2_ = (uint64_t) stoull(argv[3]);
     bytevector wealth1, wealth2;
-    uint8_t* p;
-    size_t i;
-    for(i=0, p=(uint8_t*)&wealth1_; i < sizeof(wealth1_); ++i, ++p) {
-        wealth1.push_back(*p);
-    }
-    for(i=0, p=(uint8_t*)&wealth2_; i < sizeof(wealth2_); ++i, ++p) {
-        wealth2.push_back(*p);
-    }
+    wealth1 = uint64_t_to_bytevector(wealth1_);
+    wealth2 = uint64_t_to_bytevector(wealth2_);
     Circuit c = generate_unsigned_compare_circuit(8*max(wealth1.size(), wealth2.size()));
     bytevector result = eval_circuit(c, wealth1, wealth2);
     cout << result.size() << endl;
+    size_t i;
     for(i=0; i<result.size(); ++i) {
         printf("result[%lu]: %hhu\n", i, result[i]);
     }

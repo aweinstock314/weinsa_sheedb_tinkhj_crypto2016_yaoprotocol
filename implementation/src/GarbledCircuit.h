@@ -46,7 +46,7 @@ struct ReceiverGarbledCircuit {
     bitvector evaluated;
     bitvector sigmas;
 
-    template<class OT> ReceiverGarbledCircuit(int fd, bytevector y_);
+    template<class OT> ReceiverGarbledCircuit(PhantomData<OT> ot, int fd, bytevector y_);
     bitvector eval(const bitvector& y);
 };
 
@@ -54,4 +54,79 @@ void serialize_gc(int fd, const vector<GarbledGate>& gc);
 GarbledGate deserialize_gate(int fd);
 vector<GarbledGate> deserialize_gc(int fd);
 
+template<class OT> bytevector SenderGarbledCircuit::send(int fd, bytevector x_) {
+    bitvector x = unpack_bv(x_);
+    assert(x.size() == c.num_bits);
+    size_t i;
+    write_aon(fd, (char*)&c.num_bits, sizeof(size_t));
+    serialize_gc(fd, gates);
+    for(i=0; i<c.num_bits; i++) {
+        bool sigma = x[i] ^ lambdas[i];
+        write_aon(fd, (char*)&sigma, sizeof(bool));
+    }
+    for(i=0; i<c.num_bits; i++) {
+        bool tmp = lambdas[i+c.num_bits];
+        write_aon(fd, (char*)&tmp, sizeof(bool));
+    }
+    for(i=0; i<c.num_bits; i++) {
+        write_aon(fd, (char*)(x[i] ^ lambdas[i] ? ones[i] : zeros[i]).data(), SEC_PARAM);
+    }
+    for(i=0; i<c.num_bits; i++) {
+        OT::send(fd, zeros[i], ones[i]); // todo: architechture for parallelism
+    }
+
+    bytevector result;
+    size_t output_size;
+    read_aon(fd, (char*)&output_size, sizeof(size_t));
+    read_aon(fd, (char*)result.data(), output_size);
+
+    return result;
+}
+
+template<class OT> ReceiverGarbledCircuit::ReceiverGarbledCircuit(PhantomData<OT>, int fd, bytevector y_) {
+    size_t i;
+    bitvector y = unpack_bv(y_);
+    read_aon(fd, (char*)&num_bits, sizeof(size_t));
+    assert(y.size() <= num_bits);
+    if(y.size() < num_bits) {
+        y.resize(num_bits);
+    }
+
+    gates = deserialize_gc(fd);
+
+    evaluated.resize(gates.size(), 0);
+    sigmas.resize(gates.size(), 0);
+    keys.resize(gates.size(), vector<uint8_t>(SEC_PARAM, 0));
+    lambdas.resize(num_bits);
+
+    for(i=0; i<num_bits; i++) {
+        bool sigma;
+        read_aon(fd, (char*)&sigma, sizeof(bool));
+        sigmas[i] = sigma;
+    }
+    for(i=0; i<num_bits; i++) {
+        bool tmp;
+        read_aon(fd, (char*)&tmp, sizeof(bool));
+        lambdas[i] = tmp;
+        sigmas[num_bits+i] = y[i] ^ lambdas[i];
+    }
+    for(i=0; i<num_bits; i++) {
+        keys[i].resize(SEC_PARAM);
+        write_aon(fd, (char*)keys[i].data(), SEC_PARAM);
+        evaluated[i] = true;
+    }
+    for(i=0; i<num_bits; i++) {
+        keys[i+num_bits] = OT::recv(fd, y[i] ^ lambdas[i]);
+        evaluated[i+num_bits] = true;
+    }
+
+    evaluated.resize(num_bits, false);
+
+    result = eval(y);
+
+    bytevector result_ = pack_bv(result);
+    size_t tmp = result_.size();
+    write_aon(fd, (char*)&tmp, sizeof(size_t));
+    write_aon(fd, (char*)result_.data(), tmp);
+}
 #endif
