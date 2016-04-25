@@ -23,8 +23,8 @@ def lessthan_garbled(x,y):
     s = subprocess.Popen(['./bin/yaoprotocol', 'sender', 'localhost', port, str(x)], stdout=pipe, stderr=stderr)
     (z1,_) = s.communicate()
     (z2,_) = r.communicate()
-    print("z1: %r" % z1)
-    print("z2: %r" % z2)
+    #print("z1: %r" % z1)
+    #print("z2: %r" % z2)
     reg = 'Result: ([01]*)'
     try:
         res = bool(int(re.findall(reg, z1)[0], 10))

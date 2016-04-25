@@ -47,8 +47,12 @@ SenderGarbledCircuit::SenderGarbledCircuit(Circuit c_) :
         read_aon(fd, (char*)zeros[i].data(), SEC_PARAM);
         read_aon(fd, (char*)ones[i].data(), SEC_PARAM);
 #ifdef INSECURE_DETERMINISTIC_DEBUG_HACKERY
-        memset((char*)zeros[i].data(), 0, SEC_PARAM);
-        memset((char*)ones[i].data(), ~0, SEC_PARAM);
+        //if(i != c.wires.size() - 5) {
+        //if(i != 17) {
+        if(i < c.num_bits*2) {
+            memset((char*)zeros[i].data(), 0, SEC_PARAM);
+            memset((char*)ones[i].data(), ~0, SEC_PARAM);
+        }
 #endif
 
         // produce random bit for the blindings
@@ -99,11 +103,11 @@ SenderGarbledCircuit::SenderGarbledCircuit(Circuit c_) :
                 }}
                 p->gates.push_back(gw);
 
-                /*printf("k_%lu^0 = ", i);
+                printf("k_%lu^0 = ", i);
                 print_bytevector_as_bits(p->zeros[i]);
                 printf("\nk_%lu^1 = ", i);
                 print_bytevector_as_bits(p->ones[i]);
-                printf("\n");*/
+                printf("\n");
             }
         };
         boost::apply_visitor(matcher(this, i), c.wires[i]);
@@ -210,9 +214,9 @@ bitvector ReceiverGarbledCircuit::eval(const bitvector& y) {
             dbgprintf(stderr, "\tsigma = %d\n", !!p->sigmas[i]);
             memcpy(p->keys[i].data(), buf, SEC_PARAM);
 
-            /*printf("\tL "); print_bytevector_as_bits(p->keys[w.l]); printf("\n");
+            printf("\tL "); print_bytevector_as_bits(p->keys[w.l]); printf("\n");
             printf("\tR "); print_bytevector_as_bits(p->keys[w.r]); printf("\n");
-            printf("\t- "); print_bytevector_as_bits(p->keys[i]); printf("\n");*/
+            printf("\t- "); print_bytevector_as_bits(p->keys[i]); printf("\n");
         }
         void operator()(const OutputWire& w) {
             dbgprintf(stderr, "Evaluating gate %lu OutputWire(%lu)\n", i, w.index);
