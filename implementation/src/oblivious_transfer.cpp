@@ -27,7 +27,6 @@ void * malloc_wrapper(unsigned int n);
 
 
 void RSAObliviousTransfer::send(int sockfd,  bytevector msg1, bytevector msg2 ){
-  unsigned int i;
     //Setup RSA
     AutoSeededRandomPool prng;
     RSA::PrivateKey private_key;
@@ -137,7 +136,7 @@ void RSAObliviousTransfer::send(int sockfd,  bytevector msg1, bytevector msg2 ){
     delete[] buffer;
 
 #ifdef DBG_OT
-
+    unsigned int i;
     fprintf(stderr,"\n[ot_send([...])]Message 1 is: ");
     for(i = 0;i<msg1.size();i++)
       fprintf(stderr,"0x%02x ",msg1[i]);

@@ -162,16 +162,16 @@ int sender_main(int, char** argv) {
     srand((unsigned int)time(NULL));
     unsigned int i;
     bytevector m0,m1;
-        int r0 = rand(),r1 = rand();
+    int r0 = rand();
+    int r1 = rand();
 
     //fprintf(stderr,"addr = %p, my_int[%i] = %02hhx\n",((char *)base_addr + i),i, *(char *)(base_addr+ i) );
     //fprintf(stderr,"addr = %p, my_int[%i] = %02hhx\n",((char *)base_addr + i),i, *(int *)(base_addr+ i) );
     //fprintf(stderr,"addr = %p, my_int[%i] = %02hhx\n",((char *)base_addr + i),i, *(char *)((char *)&my_int+ i) );
     //int add
-        for(i = 0;i<sizeof(int);i++)
-      {
-	m0.push_back( *(char *)((char *)&r0+ i));
-	m1.push_back( *(char *)((char *)&r1+ i));
+    for(i = 0;i<sizeof(int);i++){
+	   m0.push_back( *(char *)((char *)&r0+ i));
+	   m1.push_back( *(char *)((char *)&r1+ i));
 	}
     /*
     m0.push_back(0x01);
@@ -183,7 +183,7 @@ int sender_main(int, char** argv) {
     m1.push_back(0x03);
     */
     fprintf(stderr,"[debug-ot][sender]\n");
-    ot_send(sd,m0,m1);
+    RSAObliviousTransfer::send(sd, m0, m1);
     exit(0);
     #endif
 
@@ -254,7 +254,7 @@ int receiver_main(int, char** argv) {
     #ifdef DBG_OT
     bytevector my_msg;
     int rand_val = rand();
-    my_msg = ot_recv(sd, (*((char*)&rand_val) & 0x01) );
+    my_msg = RSAObliviousTransfer::recv(sd, (*((char*)&rand_val) & 0x01) );
 
     exit(0);
     #endif
