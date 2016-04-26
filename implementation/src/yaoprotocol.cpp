@@ -296,7 +296,154 @@ int receiver_main(int, char** argv) {
     return 0;
 }
 
+int ot_send_main(int, char** argv) {
+    string hostname = argv[2];
+    unsigned short port = (unsigned short) atoi(argv[3]);
+    uint64_t wealth = (uint64_t) stoull(argv[4]);
+    (void)hostname; (void)port; (void)wealth; // suppress -Wunused-but-set-variable
+    int sd, rc;
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+    memset(&hints, 0, sizeof(struct addrinfo));
 
+    hints.ai_family = AF_UNSPEC; //IPv4 or IPv6 allowed
+    hints.ai_socktype = SOCK_STREAM; //TCP
+    hints.ai_flags = 0;
+    hints.ai_protocol = 0;
+
+    rc = getaddrinfo(argv[2], argv[3], &hints, &result);
+    if(rc != 0){
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
+        return EXIT_FAILURE;
+    }
+
+    //Try connecting to each address
+    for(rp = result; rp != NULL; rp = rp->ai_next){
+        sd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if(sd == -1){
+            continue;
+        }
+        if(connect(sd, rp->ai_addr, rp->ai_addrlen) != -1){
+            break;
+        }
+        close(sd);
+    }
+
+    if(rp == NULL){
+        cerr << "Could not connect to specified host and port" << endl;
+        return EXIT_FAILURE;
+    }
+
+    freeaddrinfo(result);
+
+    srand((unsigned int)time(NULL));
+    unsigned int i;
+    bytevector m0,m1;
+    int r0 = rand();
+    int r1 = rand();
+
+    //fprintf(stderr,"addr = %p, my_int[%i] = %02hhx\n",((char *)base_addr + i),i, *(char *)(base_addr+ i) );
+    //fprintf(stderr,"addr = %p, my_int[%i] = %02hhx\n",((char *)base_addr + i),i, *(int *)(base_addr+ i) );
+    //fprintf(stderr,"addr = %p, my_int[%i] = %02hhx\n",((char *)base_addr + i),i, *(char *)((char *)&my_int+ i) );
+    //int add
+    for(i = 0;i<sizeof(int);i++){
+       m0.push_back( *(char *)((char *)&r0+ i));
+       m1.push_back( *(char *)((char *)&r1+ i));
+    }
+    /*
+    m0.push_back(0x01);
+    m0.push_back(0x02);
+    m0.push_back(0x03);
+
+    m1.push_back(0x02);
+    m1.push_back(0x01);
+    m1.push_back(0x03);
+    */
+    fprintf(stderr,"[debug-ot][sender]\n");
+    RSAObliviousTransfer::send(sd, m0, m1);
+    close(sd);
+
+    printf("m0: ");
+    for(unsigned int i = 0; i < m0.size(); i++){
+        printf("%#x ", m0[i]);
+    }
+    printf("\n");
+
+    printf("m1: ");
+    for(unsigned int i = 0; i < m1.size(); i++){
+        printf("%#x ", m1[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+
+int ot_recv_main(int, char** argv) {
+    unsigned short port = (unsigned short) atoi(argv[2]);
+    uint64_t wealth = (uint64_t) atoi(argv[3]);
+    (void)port; (void)wealth; // suppress -Wunused-but-set-variable
+    int sd, rc;
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+    memset(&hints, 0, sizeof(struct addrinfo));
+
+    int server_sd;
+    hints.ai_family = AF_UNSPEC; //IPv4 or IPv6 allowed
+    hints.ai_socktype = SOCK_STREAM; //TCP
+    hints.ai_flags = AI_PASSIVE; //Any IP
+    hints.ai_protocol = 0;
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
+
+    rc = getaddrinfo(NULL, argv[2], &hints, &result);
+    if(rc != 0){
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
+        return EXIT_FAILURE;
+    }
+
+    //Try to bind to each address
+    for(rp = result; rp != NULL; rp = rp->ai_next){
+        server_sd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if(server_sd == -1){
+            continue;
+        }
+        if(bind(server_sd, rp->ai_addr, rp->ai_addrlen) == 0){
+            break;
+        }
+        close(server_sd);
+    }
+
+    if(rp == NULL){
+        cerr << "Could not bind to specified port" << endl;
+        return EXIT_FAILURE;
+    }
+
+    freeaddrinfo(result);
+
+    rc = listen(server_sd, 1);
+    struct sockaddr_in client;
+    int fromlen = sizeof(client);
+    sd = accept(server_sd, (struct sockaddr *) &client, (socklen_t*) &fromlen);
+    if(sd < 0){
+        perror("Failed to accept connection");
+        return EXIT_FAILURE;
+    }
+
+
+    bytevector my_msg;
+    int rand_val = rand();
+    my_msg = RSAObliviousTransfer::recv(sd, rand_val & 0x1);
+    close(sd);
+
+    printf("Bit: %d\n", rand_val & 0x1);
+    printf("Received: ");
+    for(unsigned int i = 0; i < my_msg.size(); i++){
+        printf("%#x ", my_msg[i]);
+    }
+    printf("\n");
+    return 0;
+}
 
 int evaluator_main(int, char** argv) {
     // TODO: arbitrary precision integers
@@ -427,6 +574,12 @@ int main(int argc, char** argv) {
     }
     if(!strcmp("test_encryption", argv[1])) {
         return test_encryption_main(argc, argv);
+    }
+    if(!strcmp("ot_send", argv[1])){
+        return ot_send_main(argc, argv);
+    }
+    if(!strcmp("ot_recv", argv[1])){
+        return ot_recv_main(argc, argv);
     }
 
     print_usage();
