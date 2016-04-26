@@ -88,15 +88,6 @@ void RSAObliviousTransfer::send(int sockfd,  bytevector msg1, bytevector msg2 ){
     //cout << "Sent random message 1 " << rand_msg_1 << endl;
     //cout << "Sent random message 2 " << rand_msg_2 << endl;
 
-    #ifdef DBG_OT
-    buf_size = d.ByteCount();
-    write_aon(sockfd, (char*)&buf_size, sizeof(buf_size));
-    buffer = new byte[buf_size];
-    d.Encode(buffer, buf_size);
-    write_aon(sockfd, (char*)buffer, buf_size);
-    delete[] buffer;
-    #endif
-
     //Receive receiver's blinded encryption
     rc = read_aon(sockfd, (char*)&buf_size, sizeof(buf_size));
     CHECK_RW(rc, sizeof(buf_size), "Failed to read all bytes from blinded encryption size")
@@ -157,16 +148,6 @@ void RSAObliviousTransfer::send(int sockfd,  bytevector msg1, bytevector msg2 ){
     rc = write_aon(sockfd, (char*)buffer, buf_size);
     CHECK_RW(rc, buf_size, "Failed to write all bytes of m1'")
     delete[] buffer;
-
-#ifdef DBG_OT
-    unsigned int i;
-    fprintf(stderr,"\n[ot_send([...])]Message 1 is: ");
-    for(i = 0;i<msg1.size();i++)
-      fprintf(stderr,"0x%02x ",msg1[i]);
-    fprintf(stderr,"\n[ot_send([...])]Message 2 is: ");
-    for(i = 0;i<msg2.size();i++)
-      fprintf(stderr,"0x%02x %s",msg2[i],(i == (msg2.size() -1))?"\n":"");
-#endif
 }
 
 bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
@@ -188,21 +169,9 @@ bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
     Integer e_int, n_int,r0_int, r1_int;
     Integer bv_int,c0_int,c1_int,cb_int,mb_int;
     AutoSeededRandomPool prng;
-    bytevector msg_vector;
-
-
-    //e_int.Decode(e_buffer,e_size,Integer::UNSIGNED);
-        #ifdef DBG_OT
-    //fprintf(stderr,"[ot_recv([...])]status: begin step  1\n");
-    #endif    
-        #ifdef DBG_OT
-    //fprintf(stderr,"[ot_recv([...])]status: begin step  2\n");
-    #endif    
+    bytevector msg_vector; 
 
     //Step 3
-#ifdef DBG_OT
-    //fprintf(stderr,"[ot_recv([...])]status: begin step  3\n");
-    #endif    
     //receive size for N
     read_aon(sockfd, (char*)&n_size, sizeof(unsigned int));
     n_buffer = (byte*)calloc_wrapper(n_size, sizeof(byte));
@@ -232,21 +201,11 @@ bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
     r1_int.Decode(r1_buffer, r1_size, Integer::UNSIGNED);
 
     //Step 4
-    //bit given as argument
-        #ifdef DBG_OT
-    //fprintf(stderr,"[ot_recv([...])]status: begin step  4\n");
-    #endif    
+    //bit given as argument   
     
     //Step 5
-        #ifdef DBG_OT
-    //    fprintf(stderr,"[ot_recv([...])]status: begin step  5\n");
-    #endif    
-    //Integer::Integer	(RandomNumberGenerator & rng,size_t bitCount )	
 
     Integer random_value( prng, RAND_MESSAGE_SIZE_BITS); //random value of 1024 BITS
-    #ifdef DBG_OT
-    //random_value = Integer(3);
-    #endif
 
     Integer rb_int = (bit)? r1_int:r0_int; // if b = 0, then  ==> rb = r0; 
     //cout << "Using random value " << random_value << endl;
@@ -256,15 +215,6 @@ bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
     //a_times_b_mod_c(a,b,c)
     // a_exp_b_mod_c(a,b,c)
     // a_exp_b_mod_c(a,b,c)
-
-    #ifdef DBG_OT
-    unsigned int d_size;
-    read_aon(sockfd, (char*)&d_size, sizeof(d_size));
-    byte* buffer = new byte[d_size];
-    read_aon(sockfd, (char*)buffer, d_size);
-    Integer d = Integer(buffer, d_size);
-    delete[] buffer;
-    #endif
 
     //compute blinded value
     bv_int = (rb_int + a_exp_b_mod_c(random_value, e_int, n_int)) % n_int;
@@ -280,34 +230,9 @@ bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
     //cout << "Used exponent " << e_int << endl;
     //cout << "Generated k " << random_value << endl;
 
-    #ifdef DBG_OT
-    /*cout << "e * d mod n = " << a_times_b_mod_c(e_int, d, n_int) << endl;
-    Integer intermediate = bv_int - rb_int;
-    Integer calc_k3 = a_exp_b_mod_c(intermediate, d, n_int);
-    Integer calc_k = a_exp_b_mod_c((bv_int - rb_int), d, n_int);
-    cout << "Calculated k " << calc_k << endl;
-    ModularArithmetic ma(n_int);
-    Integer calc_k2 = ma.Exponentiate(random_value, d * e_int);
-    //Integer k1 = ma.Exponentiate((v - rand_msg_2), d);
-    Integer calc_k2 = (bv_int - rb_int);
-    Integer val = (bv_int - rb_int);
-    for(unsigned int j = 0; j < d; j++){
-        calc_k2 *= val;
-        calc_k2 %= n_int;
-    }
-    cout << "Calculated our own way k " << calc_k2 << endl;
-    cout << "Intermediate calc " << calc_k3 << endl;*/
-    #endif
-
     //Step 6
     //N/A
-        #ifdef DBG_OT
-    //    fprintf(stderr,"[ot_recv([...])]status: begin step  6\n");
-    #endif    
-    //Step 7
-        #ifdef DBG_OT
-    //    fprintf(stderr,"[ot_recv([...])]status: begin step  7\n");
-    #endif
+
     //receive size of c_0
     read_aon(sockfd, (char*)&c0_size, sizeof(unsigned int));
     c0_buffer = (byte *)calloc_wrapper(c0_size, sizeof(byte));
@@ -331,9 +256,7 @@ bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
 
     //step 8    
     //get message
-    #ifdef DBG_OT
-    //    fprintf(stderr,"[ot_recv([...])]status:begin step 8\n");
-      #endif
+
     //choose message
     mb_int = (bit)?(c1_int - random_value):(c0_int - random_value);
     mb_size = (bit)?(c_1_actual_size):(c_0_actual_size);
@@ -342,10 +265,7 @@ bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
     mb_int.Encode(mb_buffer, mb_size, Integer::UNSIGNED);
     for(i = 0;i<mb_size;i++)
       msg_vector.push_back(mb_buffer[i]);
-
-        #ifdef DBG_OT
-    //    fprintf(stderr,"[ot_recv([...])]status: free them all!\n");
-    #endif    
+    
         //void *memset(void *s, int c, size_t n);
     memset(n_buffer, 0, n_size);
     free(n_buffer);
@@ -371,15 +291,6 @@ bytevector RSAObliviousTransfer::recv(int sockfd, uint8_t bit){
     memset(mb_buffer, 0, mb_size);
     free(mb_buffer);
 
-
-
-#ifdef DBG_OT
-    //fprintf(stderr,"[ot_recv([...])]status:begin step  ")
-    fprintf(stderr,"[ot_recv([...])][end] bit = %02x\n",bit);
-    fprintf(stderr,"[ot_recv([...])][end] ");
-    for(i = 0;i<msg_vector.size();i++)
-      fprintf(stderr,"0x%02x %s",msg_vector[i],(i == (msg_vector.size() -1))?"\n":"");
-    #endif
     return msg_vector;
 }
 
