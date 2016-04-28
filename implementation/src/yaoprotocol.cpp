@@ -198,14 +198,13 @@ int sender_main(int, char** argv) {
     printf("x = %lu = ", wealth);
     print_bytevector_as_bits(x);
     printf("\n");
-    x.resize(1); //UGLY HACK TO GET 8-bit circuit
 
     Circuit c = generate_unsigned_compare_circuit( x.size() * 8 );
     SenderGarbledCircuit sgc(c);
 
 
-    //bytevector yao_result = sgc.send<RSAObliviousTransfer>(sd, x);
-    bytevector yao_result = sgc.send<TerriblyInsecureObliviousTransfer>(sd, x);
+    bytevector yao_result = sgc.send<RSAObliviousTransfer>(sd, x);
+    //bytevector yao_result = sgc.send<TerriblyInsecureObliviousTransfer>(sd, x);
     printf("Result: ");
     print_bytevector_as_bits(yao_result);
     printf("\n");
@@ -283,10 +282,9 @@ int receiver_main(int, char** argv) {
     printf("y = %lu = ", wealth);
     print_bytevector_as_bits(y);
     printf("\n");
-    y.resize(1);
 
-    //ReceiverGarbledCircuit rgc(PhantomData<RSAObliviousTransfer>(), sd, y);
-    ReceiverGarbledCircuit rgc(PhantomData<TerriblyInsecureObliviousTransfer>(), sd, y);
+    ReceiverGarbledCircuit rgc(PhantomData<RSAObliviousTransfer>(), sd, y);
+    //ReceiverGarbledCircuit rgc(PhantomData<TerriblyInsecureObliviousTransfer>(), sd, y);
 
     printf("Result: ");
     print_bytevector_as_bits(pack_bv(rgc.result));

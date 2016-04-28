@@ -80,8 +80,14 @@ template<class OT> bytevector SenderGarbledCircuit::send(int fd, bytevector x_) 
     }
     dbgprintf(stderr, "OTing receiver's keys\n");
     for(i=0; i<c.num_bits; i++) {
-        OT::send(fd, zeros[i], ones[i]); // todo: architechture for parallelism
+        OT::send(fd, zeros[i+c.num_bits], ones[i+c.num_bits]); // todo: architechture for parallelism
     }
+#ifdef KEY_DEBUG_INSTRUMENTATION
+    for(i=0; i<c.num_bits*2; i++) {
+        printf("zeros[%02lu] = ", i); print_bytevector_as_bits(zeros[i]); printf("\n");
+        printf(" ones[%02lu] = ", i); print_bytevector_as_bits(ones[i]); printf("\n");
+    }
+#endif
 
     bytevector result;
     size_t output_size;
@@ -106,7 +112,7 @@ template<class OT> ReceiverGarbledCircuit::ReceiverGarbledCircuit(PhantomData<OT
 
     evaluated.resize(gates.size(), 0);
     sigmas.resize(gates.size(), 0);
-    keys.resize(gates.size(), vector<uint8_t>(SEC_PARAM, 0));
+    keys.resize(gates.size(), bytevector(SEC_PARAM,0));
     lambdas.resize(num_bits);
 
     dbgprintf(stderr, "Deserializing sigmas\n");
@@ -137,7 +143,11 @@ template<class OT> ReceiverGarbledCircuit::ReceiverGarbledCircuit(PhantomData<OT
         evaluated[i+num_bits] = true;
     }
 
-    evaluated.resize(num_bits, false);
+#ifdef KEY_DEBUG_INSTRUMENTATION
+    for(i=0; i<num_bits*2; i++) {
+        printf("keys[%02lu] = ", i); print_bytevector_as_bits(keys[i]); printf("\n");
+    }
+#endif
 
     result = eval(y);
 

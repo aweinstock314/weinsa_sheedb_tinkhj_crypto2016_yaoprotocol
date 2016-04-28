@@ -47,11 +47,13 @@ SenderGarbledCircuit::SenderGarbledCircuit(Circuit c_) :
         read_aon(fd, (char*)zeros[i].data(), SEC_PARAM);
         read_aon(fd, (char*)ones[i].data(), SEC_PARAM);
 #ifdef INSECURE_DETERMINISTIC_DEBUG_HACKERY
-        //if(i != c.wires.size() - 5) {
-        //if(i != 17) {
+        //memset((char*)zeros[i].data(), 0, SEC_PARAM/2);
+        //memset((char*)ones[i].data(), 0, SEC_PARAM/2);
         if(i < c.num_bits*2) {
             memset((char*)zeros[i].data(), 0, SEC_PARAM);
             memset((char*)ones[i].data(), ~0, SEC_PARAM);
+            zeros[i][i] = ~0;
+            ones[i][i] = 0;
         }
 #endif
 
@@ -103,11 +105,10 @@ SenderGarbledCircuit::SenderGarbledCircuit(Circuit c_) :
                 }}
                 p->gates.push_back(gw);
 
-                printf("k_%lu^0 = ", i);
-                print_bytevector_as_bits(p->zeros[i]);
-                printf("\nk_%lu^1 = ", i);
-                print_bytevector_as_bits(p->ones[i]);
-                printf("\n");
+#ifdef KEY_DEBUG_INSTRUMENTATION
+                printf("k_%lu^0 = ", i); print_bytevector_as_bits(p->zeros[i]);
+                printf("\nk_%lu^1 = ", i); print_bytevector_as_bits(p->ones[i]); printf("\n");
+#endif
             }
         };
         boost::apply_visitor(matcher(this, i), c.wires[i]);
@@ -214,9 +215,11 @@ bitvector ReceiverGarbledCircuit::eval(const bitvector& y) {
             dbgprintf(stderr, "\tsigma = %d\n", !!p->sigmas[i]);
             memcpy(p->keys[i].data(), buf, SEC_PARAM);
 
+#ifdef KEY_DEBUG_INSTRUMENTATION
             printf("\tL "); print_bytevector_as_bits(p->keys[w.l]); printf("\n");
             printf("\tR "); print_bytevector_as_bits(p->keys[w.r]); printf("\n");
             printf("\t- "); print_bytevector_as_bits(p->keys[i]); printf("\n");
+#endif
         }
         void operator()(const OutputWire& w) {
             dbgprintf(stderr, "Evaluating gate %lu OutputWire(%lu)\n", i, w.index);
