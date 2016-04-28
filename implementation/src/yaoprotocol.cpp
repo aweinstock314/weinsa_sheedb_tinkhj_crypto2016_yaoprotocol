@@ -15,8 +15,6 @@
 #include "Circuit.h"
 #include "GarbledCircuit.h"
 #include "oblivious_transfer.h"
-#include "ReceiverEvaluator.h"
-#include "SenderEvaluator.h"
 #include "utils.h"
 
 using namespace boost;
@@ -189,10 +187,6 @@ int sender_main(int, char** argv) {
     exit(0);
     #endif
 
-
-    //SenderEvaluator eval = SenderEvaluator( sizeof(wealth) * 8 );
-    //eval.execute_protocol(sd);
-
     // TODO: arbitrary-precision wealth
     bytevector x = uint64_t_to_bytevector(wealth);
     printf("x = %lu = ", wealth);
@@ -275,10 +269,6 @@ int receiver_main(int, char** argv) {
 
     exit(0);
     #endif
-
-
-    //ReceiverEvaluator eval = ReceiverEvaluator(sizeof(wealth) * 8);
-    //eval.execute_protocol(sd);
 
     bytevector y = uint64_t_to_bytevector(wealth);
     printf("y = %lu = ", wealth);
