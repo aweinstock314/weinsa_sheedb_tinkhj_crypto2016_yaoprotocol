@@ -205,9 +205,11 @@ int sender_main(int, char** argv) {
 
     bytevector yao_result = sgc.send<RSAObliviousTransfer>(sd, x);
     //bytevector yao_result = sgc.send<TerriblyInsecureObliviousTransfer>(sd, x);
-    printf("Result: ");
-    print_bytevector_as_bits(yao_result);
-    printf("\n");
+
+    printf("Result: "); print_bytevector_as_bits(yao_result); printf("\n");
+
+    assert(yao_result.size() > 0);
+    printf("%s's value was larger (or equal).\n", !yao_result[0] ? "Sender" : "Receiver");
 
     close(sd);
     return 0;
@@ -286,9 +288,10 @@ int receiver_main(int, char** argv) {
     ReceiverGarbledCircuit rgc(PhantomData<RSAObliviousTransfer>(), sd, y);
     //ReceiverGarbledCircuit rgc(PhantomData<TerriblyInsecureObliviousTransfer>(), sd, y);
 
-    printf("Result: ");
-    print_bytevector_as_bits(pack_bv(rgc.result));
-    printf("\n");
+    printf("Result: "); print_bytevector_as_bits(pack_bv(rgc.result)); printf("\n");
+
+    assert(rgc.result.size() > 0);
+    printf("%s's value was larger (or equal).\n", !rgc.result[0] ? "Sender" : "Receiver");
 
     close(sd);
     return 0;
