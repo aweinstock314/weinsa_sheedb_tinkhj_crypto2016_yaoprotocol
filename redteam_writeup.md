@@ -13,6 +13,12 @@ use this as a lightweight framework for timing attacks
 
 ## Projects
 ### `AlanJamesMike_yao.zip`
+- Suspicious things:
+    - `yao_server.cpp`: `while( " 'Unnoticeable backdoors are hard to make, props to the nsa' - Mike Macelletti, 2016" ){`  
+    (a string literal counts as nonzero, so this is an infinite loop, equivalent to `while(1){`)
+    - `circuit.cpp`:
+        - `Gate::Gate()` does not initialize the keys to random, it leaves them uninitialized
+        - The `for(...) { switch(i) { ... } }` in `Circuit::generateBitComparator(unsigned)` to deduplicate code
 
 ### `brenoc_crypto_MPC_project_v1.zip`
 - There's a neatly organized filesystem hierarchy:
