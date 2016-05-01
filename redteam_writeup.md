@@ -1,4 +1,10 @@
 # Red team writeup
+Authors
+-----------
+* Jassiem Ifill
+* Brian Sheedy
+* Jacob Tinkhouser
+* Avi Weinstock
 
 ## General techniques
 
@@ -45,7 +51,13 @@ use this as a lightweight framework for timing attacks
         6. Sends the value of the output wire
 
 ### `EthanJoshuaChris.zip`
+We were unable to find any backdoors or other ways to obtain more information than the protocol specifies. As far as we can tell, the protocol performs exactly as it should in a reasonable time. In fact, the protocol is faster than our code. However, we suspect this is due to the fact that the our code operates on 64-bit integers, while theirs operates on 32-bit integers. Their code takes approximately 4.5 seconds to complete, while ours completes in approximately 6.25 seconds, which is less than twice the time despite operating on twice the bits.
 
+Although we were unable to obtain additional information, we did find a number of oddities with the code. First, it was possible for the binaries to segfault at random on inputs that worked previously. Once this occured, the program would continue to segfault when run until recompiled. This seemed very suspicious to us, as different runs of the protocol should be independent. The fact that the program continued to segfault after a single segfault implied that information was being stored and used between multiple runs. However, we were unable to find any sort of backdoor in the code that worked in this way.
+
+Second, the protocol takes 32-bit signed integers. While the problem is called the "Millionaire's Problem", implying that the numbers being compared are in the millions and thus fit fine in 32-bit signed integers, there exist people in the world with more money than a 32-bit signed integer can store. This means that it's feasible for the protocol to return incorrect outputs on reasonable inputs due to integer overflows.
+
+Finally, the prime used for the finite field as well as the generator used for oblivious transfer are hard-coded instead of being generated at runtime. The prime used is 133 bits, so it is infeasible to brute force the exponent and break the oblivious transfer implementation. However, it would be more secure if the prime and generator were chosen randomly every run.
 
 ## Footnotes
 1. [https://adriftwith.me/coding/2010/08/13/reversing-the-mersenne-twister-rng-temper-function/]()
