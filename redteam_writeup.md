@@ -24,6 +24,23 @@ While the protocol itself appears to be secure and not leak any information, the
 
 The implementation appears to be noticeably faster than ours, as it takes approximately 5 seconds to complete compared to our 6.25 seconds. This is with the number of bits specified as 64, so the running times should be directly comparable. This is likely due to a faster oblivious transfer implementation, as that is where the majority of time is spent in our implementation.
 
+The client has some memory leaks, but no use of uninitialized memory. The valgrind output for the server is not useful, as there is no way to end the process without killing it prematurely, but it is likely that there exist some memory leaks in there, as well. However, these memory leaks are not useful for obtaining information, so they do not affect the security of the protocol.
+
+#### Client
+```
+==6746== HEAP SUMMARY:
+==6746==     in use at exit: 225,440 bytes in 4,233 blocks
+==6746==   total heap usage: 1,113,167 allocs, 1,108,934 frees, 133,965,086 bytes allocated
+==6746== 
+==6746== LEAK SUMMARY:
+==6746==    definitely lost: 45,472 bytes in 393 blocks
+==6746==    indirectly lost: 179,968 bytes in 3,840 blocks
+==6746==      possibly lost: 0 bytes in 0 blocks
+==6746==    still reachable: 0 bytes in 0 blocks
+==6746==         suppressed: 0 bytes in 0 blocks
+==6746== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+```
+
 ### `brenoc_crypto_MPC_project_v1.zip`
 - There's a neatly organized filesystem hierarchy:
     - `client` contains the receiver/circuit evaluator
