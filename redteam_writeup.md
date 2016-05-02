@@ -20,6 +20,8 @@ use this as a lightweight framework for timing attacks
         - `Gate::Gate()` does not initialize the keys to random, it leaves them uninitialized
         - The `for(...) { switch(i) { ... } }` in `Circuit::generateBitComparator(unsigned)` to deduplicate code
 
+While the protocol itself appears to be secure and not leak any information, the implementation itself has a potential information leak. The implementation allows multiple connections to the server instead of only allowing one connection per run. This would allow an adversary to connect multiple times with different values in order to perform a binary search on the server's input. This is possible on all implementations if both parties agree to run the protocol multiple times, and one always inputs the same value, but it is easier in this case since the multiple runs of the protocol are performed on what is known to be the same value. This is not a semi-honest attack, though, as the adversary does not input their real value.
+
 ### `brenoc_crypto_MPC_project_v1.zip`
 - There's a neatly organized filesystem hierarchy:
     - `client` contains the receiver/circuit evaluator
@@ -60,6 +62,20 @@ use this as a lightweight framework for timing attacks
 We were unable to find any backdoors or other ways to obtain more information than the protocol specifies. As far as we can tell, the protocol performs exactly as it should in a reasonable time. In fact, the protocol is faster than our code. However, we suspect this is due to the fact that the our code operates on 64-bit integers, while theirs operates on 32-bit integers. Their code takes approximately 4.5 seconds to complete, while ours completes in approximately 6.25 seconds, which is less than twice the time despite operating on twice the bits.
 
 Although we were unable to obtain additional information, we did find a number of oddities with the code. First, it was possible for the binaries to segfault at random on inputs that worked previously. Once this occured, the program would continue to segfault when run until recompiled. This seemed very suspicious to us, as different runs of the protocol should be independent. The fact that the program continued to segfault after a single segfault implied that information was being stored and used between multiple runs. However, we were unable to find any sort of backdoor in the code that worked in this way.
+
+Another possible reason for this behavior is memory corruption issues. This is possible, as valgrind shows that the receiver (alice) has numerous memory leaks and uses of uninitialized memory. However, this likely would not be usable in a semi-honest attack. Valgrind output is:
+'''
+==6002== HEAP SUMMARY:
+==6002==     in use at exit: 12,348 bytes in 378 blocks
+==6002==   total heap usage: 1,276,518 allocs, 1,276,140 frees, 72,256,485 bytes allocated
+==6002== 
+==6002== LEAK SUMMARY:
+==6002==    definitely lost: 2,016 bytes in 126 blocks
+==6002==    indirectly lost: 10,332 bytes in 252 blocks
+==6002==      possibly lost: 0 bytes in 0 blocks
+==6002==    still reachable: 0 bytes in 0 blocks
+==6002==         suppressed: 0 bytes in 0 blocks
+'''
 
 Second, the protocol takes 32-bit signed integers. While the problem is called the "Millionaire's Problem", implying that the numbers being compared are in the millions and thus fit fine in 32-bit signed integers, there exist people in the world with more money than a 32-bit signed integer can store. This means that it's feasible for the protocol to return incorrect outputs on reasonable inputs due to integer overflows.
 
