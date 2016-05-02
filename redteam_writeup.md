@@ -76,6 +76,7 @@ Another possible reason for this behavior is memory corruption issues. This is p
 ==6002==      possibly lost: 0 bytes in 0 blocks
 ==6002==    still reachable: 0 bytes in 0 blocks
 ==6002==         suppressed: 0 bytes in 0 blocks
+==6002== ERROR SUMMARY: 17792 errors from 41 contexts (suppressed: 0 from 0)
 ```
 
 Second, the protocol takes 32-bit signed integers. While the problem is called the "Millionaire's Problem", implying that the numbers being compared are in the millions and thus fit fine in 32-bit signed integers, there exist people in the world with more money than a 32-bit signed integer can store. This means that it's feasible for the protocol to return incorrect outputs on reasonable inputs due to integer overflows.
