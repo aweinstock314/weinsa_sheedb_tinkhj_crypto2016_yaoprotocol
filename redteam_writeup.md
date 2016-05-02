@@ -22,6 +22,8 @@ use this as a lightweight framework for timing attacks
 
 While the protocol itself appears to be secure and not leak any information, the implementation itself has a potential information leak. The implementation allows multiple connections to the server instead of only allowing one connection per run. This would allow an adversary to connect multiple times with different values in order to perform a binary search on the server's input. This is possible on all implementations if both parties agree to run the protocol multiple times, and one always inputs the same value, but it is easier in this case since the multiple runs of the protocol are performed on what is known to be the same value. This is not a semi-honest attack, though, as the adversary does not input their real value.
 
+The implementation appears to be noticeably faster than ours, as it takes approximately 5 seconds to complete compared to our 6.25 seconds. This is with the number of bits specified as 64, so the running times should be directly comparable. This is likely due to a faster oblivious transfer implementation, as that is where the majority of time is spent in our implementation.
+
 ### `brenoc_crypto_MPC_project_v1.zip`
 - There's a neatly organized filesystem hierarchy:
     - `client` contains the receiver/circuit evaluator
