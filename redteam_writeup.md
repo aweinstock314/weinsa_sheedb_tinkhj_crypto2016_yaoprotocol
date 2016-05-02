@@ -64,7 +64,8 @@ We were unable to find any backdoors or other ways to obtain more information th
 Although we were unable to obtain additional information, we did find a number of oddities with the code. First, it was possible for the binaries to segfault at random on inputs that worked previously. Once this occured, the program would continue to segfault when run until recompiled. This seemed very suspicious to us, as different runs of the protocol should be independent. The fact that the program continued to segfault after a single segfault implied that information was being stored and used between multiple runs. However, we were unable to find any sort of backdoor in the code that worked in this way.
 
 Another possible reason for this behavior is memory corruption issues. This is possible, as valgrind shows that the receiver (alice) has numerous memory leaks and uses of uninitialized memory. However, this likely would not be usable in a semi-honest attack. Valgrind output is:
-'''
+
+```
 ==6002== HEAP SUMMARY:
 ==6002==     in use at exit: 12,348 bytes in 378 blocks
 ==6002==   total heap usage: 1,276,518 allocs, 1,276,140 frees, 72,256,485 bytes allocated
@@ -75,7 +76,7 @@ Another possible reason for this behavior is memory corruption issues. This is p
 ==6002==      possibly lost: 0 bytes in 0 blocks
 ==6002==    still reachable: 0 bytes in 0 blocks
 ==6002==         suppressed: 0 bytes in 0 blocks
-'''
+```
 
 Second, the protocol takes 32-bit signed integers. While the problem is called the "Millionaire's Problem", implying that the numbers being compared are in the millions and thus fit fine in 32-bit signed integers, there exist people in the world with more money than a 32-bit signed integer can store. This means that it's feasible for the protocol to return incorrect outputs on reasonable inputs due to integer overflows.
 
