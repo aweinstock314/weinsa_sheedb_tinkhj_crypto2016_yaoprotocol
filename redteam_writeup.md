@@ -102,7 +102,8 @@ Another possible reason for this behavior is memory corruption issues. This is p
 
 Second, the protocol takes 32-bit signed integers. While the problem is called the "Millionaire's Problem", implying that the numbers being compared are in the millions and thus fit fine in 32-bit signed integers, there exist people in the world with more money than a 32-bit signed integer can store. This means that it's feasible for the protocol to return incorrect outputs on reasonable inputs due to integer overflows.
 
-Finally, the prime used for the finite field as well as the generator used for oblivious transfer are hard-coded instead of being generated at runtime. The prime (we verified that it is in fact prime) used is 133 bits, so it is infeasible to brute force the exponent and break the oblivious transfer implementation. However, it would be more secure if the prime and generator were chosen randomly every run. The fact that they're hard coded to those specific values is very, very suspicious, but again, we could not find any backdoors based on this.
+Finally, the prime used for the finite field as well as the generator used for oblivious transfer are hard-coded instead of being generated at runtime. The prime (we verified that it is in fact prime) used is 133 bits, so it is infeasible to brute force the exponent and break the oblivious transfer implementation. However, it would be more secure if the prime and generator were chosen randomly every run. The fact that they're hard coded to those specific values is very, very suspicious. A potential attack that this could be used for is GeneralNumberFieldSieve precomputation, as (allegedly) used by the NSA for the TLS Logjam exploit<sup>2</sup>.
 
 ## Footnotes
 1. [https://adriftwith.me/coding/2010/08/13/reversing-the-mersenne-twister-rng-temper-function/]()
+2. [https://en.wikipedia.org/wiki/Logjam_%28computer_security%29]()
