@@ -26,6 +26,8 @@ The implementation appears to be noticeably faster than ours, as it takes approx
 
 The client has some memory leaks, but no use of uninitialized memory. The valgrind output for the server is not useful, as there is no way to end the process without killing it prematurely, but it is likely that there exist some memory leaks in there, as well. However, these memory leaks are not useful for obtaining information, so they do not affect the security of the protocol.
 
+In addition, there are frequent misappropriation between signed ints and unsigned ints within sizes involved in circuit construction, and network communication, raising possible vulnerabilities in a malicious scenario which may also be dependent on which party the adversary corrupts.
+
 #### Client
 ```
 ==6746== HEAP SUMMARY:
